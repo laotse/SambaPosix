@@ -74,15 +74,19 @@ def main(argv=None):
         if arg == '--':
             doArgs = False
 
-    if cmd is None:
-        sys.stderr.write(program_name + " command [options]" + "\n")
-        indent = len(program_name) * " "
-        sys.stderr.write(indent + "  for help use --help")
-        return 2
-
     if cmd == 'user':
         from SambaPosix.User import User
         User(argv, parser, program_name)
+    elif cmd == 'group':
+        from SambaPosix.Group import Group
+        Group(argv, parser, program_name)
+    else:
+        sys.stderr.write(program_name + " command [options]" + "\n")
+        indent = len(program_name) * " "
+        sys.stderr.write(indent + "  for help use --help")
+        sys.stderr.write(indent + "  known commands: user, group")
+        return 2
+
 
         """
         if opts.verbose > 0:
