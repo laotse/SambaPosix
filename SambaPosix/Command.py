@@ -7,6 +7,8 @@ Created on 11.09.2014
 import sys
 import ldap, ldap.sasl
 
+from SambaPosix.LDAPEntry import LDAPEntry
+
 class Command(object):
     '''
     classdocs
@@ -79,12 +81,5 @@ class Command(object):
         self.trace("Search at %s for %s" % (self.opts.base, query))
         results = self.LDAP.search_s(self.opts.base, ldap.SCOPE_SUBTREE, query)
         # we get those strange results without DN - referrals?
-        results = [x for x in results if x[0] is not None]
+        results = [LDAPEntry(x) for x in results if x[0] is not None]
         return results
-
-    def checkValue(self, entry, attribute, value):
-        if not attribute in entry:
-            return False
-        if not value in entry[attribute]:
-            return False
-        return True

@@ -41,28 +41,17 @@ class User(Command):
         parser.add_option_group(group)
         return parser
 
-    def getPosixAttribute(self,entry,att):
-        if not att in entry:
-            return None
-        if len(entry[att]) < 1:
-            return None
-        if len(entry[att]) > 1:
-            self.error("POSIX attribute %s exists %d times!" % (att, len(entry[att])))
-            return None
-        return entry[att][0]
-
     def formatAsGetent(self,entry):
         out = []
-        out += [self.getPosixAttribute(entry, 'uid')]
+        out += [entry.getSingleValue('uid')]
         out += ['x']
-        out += [self.getPosixAttribute(entry, 'uidNumber')]
-        out += [self.getPosixAttribute(entry, 'primaryGroupID')]
-        out += [self.getPosixAttribute(entry, 'gecos')]
-        out += [self.getPosixAttribute(entry, 'unixHomeDirectory')]
-        out += [self.getPosixAttribute(entry, 'loginShell')]
+        out += [entry.getSingleValue('uidNumber')]
+        out += [entry.getSingleValue('primaryGroupID')]
+        out += [entry.getSingleValue('gecos')]
+        out += [entry.getSingleValue('unixHomeDirectory')]
+        out += [entry.getSingleValue('loginShell')]
 
         return ":".join([x if x is not None else "" for x in out])
-
 
     def do_show(self):
         if len(self.args) > 0:
@@ -73,7 +62,7 @@ class User(Command):
         if accounts is None and self.opts.uid is not None:
             entries = self.search('(&(objectClass=posixAccount)(uidNumber=%s))' % self.opts.uid)
             accounts = []
-            for _, record in entries:
+            for record in entries:
                 if 'sAMAccountName' in record:
                     accounts += record['sAMAccountName']
         if accounts is None:
@@ -86,8 +75,8 @@ class User(Command):
             elif len(entries) > 1:
                 self.result("Error: %d matching users for %s" % (len(entries),user))
             else:
-                _, entry = entries[0]
-                if not self.checkValue(entry, 'objectClass', 'posixAccount'):
+                entry = entries[0]
+                if not entry.hasAttribute('objectClass', 'posixAccount'):
                     self.result("%s: no POSIX extensions" % user)
                 else:
                     self.result(self.formatAsGetent(entry))
@@ -96,5 +85,5 @@ class User(Command):
 
     def do_getent(self):
         accounts = self.search('(objectClass=posixAccount)')
-        for _, entry in accounts:
+        for entry in accounts:
             self.result(self.formatAsGetent(entry))
