@@ -6,7 +6,7 @@ Created on 11.09.2014
 
 import sys
 import ldap, ldap.sasl
-import re
+import re, string
 
 from SambaPosix.LDAPEntry import LDAPEntry
 
@@ -61,6 +61,32 @@ class Command(object):
         if not re.match('^[_.A-Za-z0-9][-\@_.A-Za-z0-9]*\$?$',val): return False
         # FIXME: should be LOGIN_NAME_MAX
         if len(val) > 255: return False
+        return True
+
+    def checkPosixPath(self,val):
+        if val is None: return True
+        # must be absolute
+        if not val[0] == '/': return False
+        # find non-printables
+        if not all(c in string.printable for c in val):
+            return False
+        # this would break getent
+        if re.search(':',val):
+            return False
+        # FIXME: should be PATH_MAX
+        if len(val) > 1024: return False
+        return True
+
+    def checkGecos(self,val):
+        if val is None: return True
+        # find non-printables
+        if not all(c in string.printable for c in val):
+            return False
+        # this would break getent
+        if re.search(':',val):
+            return False
+        # FIXME: no idea what may be a good length
+        if len(val) > 1024: return False
         return True
 
     def dispatchCommand(self,prefix='do_'):
