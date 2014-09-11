@@ -7,6 +7,8 @@ Created on 11.09.2014
 from SambaPosix.Command import Command
 from optparse import OptionGroup
 
+import ldap
+
 class User(Command):
     '''
     classdocs
@@ -50,7 +52,12 @@ class User(Command):
             raise ValueError("%s is not valid for user name" % self.opts.user)
         if not self.checkPosixName(self.opts.group):
             raise ValueError("%s is not valid for group name" % self.opts.group)
-        # TODO: paths and gecos
+        if not self.checkPosixPath(self.opts.shell):
+            raise ValueError("%s is not valid for shell" % self.opts.shell)
+        if not self.checkPosixPath(self.opts.home):
+            raise ValueError("%s is not valid for home" % self.opts.home)
+        if not self.checkGecos(self.opts.gecos):
+            raise ValueError("%s is not valid for gecos" % self.opts.gecos)
         return Command.sanitizeOptions(self)
 
     def formatAsGetent(self,entry):
@@ -165,3 +172,34 @@ class User(Command):
             out += " Groups=" + ",".join(groups)
 
         self.result(out)
+
+    def makeModify(self,entry,val,attribute):
+        if val is None:
+            return None
+        cur = entry.getSingleValue(attribute)
+        if cur == val:
+            return None
+        if cur is None:
+            return (ldap.MOD_ADD, attribute, val)
+        return (ldap.MOD_REPLACE, attribute, val)
+
+    def do_set(self):
+        user, entry = self.locateFirstUser()
+        if user is None:
+            self.error("No user specified for modification")
+            return
+
+        modify = []
+        if not entry.hasAttribute('objectClass', 'posixAccount'):
+            modify += [(ldap.MOD_ADD, 'objectClass', 'posixAccount')]
+        modify += [self.makeModify(entry, user, 'uid')]
+
+        modify += [self.makeModify(entry, self.opts.uid, 'uidNumber')]
+        modify += [self.makeModify(entry, self.opts.gid, 'primaryGroupID')]
+        modify += [self.makeModify(entry, self.opts.home, 'unixHomeDirectory')]
+        modify += [self.makeModify(entry, self.opts.shell, 'loginShell')]
+        modify += [self.makeModify(entry, self.opts.gecos, 'gecos')]
+
+        modify = [x for x in modify if not x is None]
+        if len(modify) > 0:
+            self.modify(entry.dn(), modify)
