@@ -6,6 +6,7 @@ Created on 11.09.2014
 
 import sys
 import ldap, ldap.sasl
+import re
 
 from SambaPosix.LDAPEntry import LDAPEntry
 
@@ -37,12 +38,30 @@ class Command(object):
         self.args = self.args[1:]
         self.CommandPath = [self.Command]
         self.LDAP = None
+        self.sanitizeOptions()
 
     def setupOptions(self,parser):
         return parser
 
     def setupUsage(self):
         self.usage_string = "usage: %s %s [options]" % (self.program_name,self.Command)
+
+    def sanitizeOptions(self):
+        return True
+
+    def checkPOSIXID(self,val):
+        if val is None: return True
+        if not re.match('^[0-9]+$',val): return False
+        if int(val) > 65535: return False
+        return True
+
+    def checkPosixName(self,val):
+        if val is None: return True
+        # FIXME: should be NAME_REGEX
+        if not re.match('^[_.A-Za-z0-9][-\@_.A-Za-z0-9]*\$?$',val): return False
+        # FIXME: should be LOGIN_NAME_MAX
+        if len(val) > 255: return False
+        return True
 
     def dispatchCommand(self,prefix='do_'):
         cmd_name = self.args[0]
@@ -65,6 +84,9 @@ class Command(object):
     def trace(self,msg, level = 3):
         if self.opts.verbose >= level:
             sys.stderr.write(msg + '\n')
+
+    def ldif(self,msg):
+        sys.stdout.write(msg+'\n')
 
     def result(self,msg):
         sys.stdout.write(msg + '\n')
@@ -94,3 +116,24 @@ class Command(object):
         if len(results) < 1:
             return None
         return LDAPEntry(results[0])
+
+    def modify(self,dn,modlist):
+        if self.opts.dry_run:
+            self.ldif("dn: %s" % dn)
+            self.ldif("changetype: modify")
+            first = True
+            for m in modlist:
+                if not first:
+                    self.ldif('-')
+                if m[0] == ldap.MOD_ADD:
+                    self.ldif("add: %s" % m[1])
+                elif m[0] == ldap.MOD_DELETE:
+                    self.ldif("delete: %s" % m[1])
+                elif m[0] == ldap.MOD_REPLACE:
+                    self.ldif("replace: %s" % m[1])
+                else:
+                    raise ValueError("Unknown action for changetype modify!")
+                self.ldif("%s: %s" % (m[1],m[2]))
+                first = False
+        else:
+            self.LDAP.modify_s(dn, modlist)

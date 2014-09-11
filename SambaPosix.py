@@ -51,11 +51,11 @@ def main(argv=None):
     parser = OptionParser(version=program_version_string, epilog=program_longdesc, description=program_license)
     #parser.set_usage(program_usage)
     # set defaults
-    parser.set_defaults(base="dc=ad,dc=microsult,dc=de", url="ldap://samba.ad.microsult.de")
+    parser.set_defaults(base="dc=ad,dc=microsult,dc=de", url="ldap://samba.ad.microsult.de", dry_run=False)
 
     group = OptionGroup(parser,"General options")
     group.add_option("-v", "--verbose", dest="verbose", action="count", help="set verbosity level [default: %default]")
-    group.add_option("-n", "--dry", dest="dry_run", help="do not modify LDAP, just show what would be done")
+    group.add_option("-n", "--dry", dest="dry_run", action="store_true", help="do not modify LDAP, just show what would be done")
     group.add_option("-o", "--log", dest="logfile", help="set logfile path and enable logging", metavar="FILE")
     group.add_option("", "--show", dest="show", help="show information present in LDAP")
     group.add_option("-H", "--url", dest="url", help="URL of AD DC [default: %default]", metavar="URL")
