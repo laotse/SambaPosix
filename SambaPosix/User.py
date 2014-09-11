@@ -41,6 +41,18 @@ class User(Command):
         parser.add_option_group(group)
         return parser
 
+    def sanitizeOptions(self):
+        if not self.checkPOSIXID(self.opts.uid):
+            raise ValueError("%s is not valid for user id" % self.opts.uid)
+        if not self.checkPOSIXID(self.opts.gid):
+            raise ValueError("%s is not valid for group id" % self.opts.gid)
+        if not self.checkPosixName(self.opts.user):
+            raise ValueError("%s is not valid for user name" % self.opts.user)
+        if not self.checkPosixName(self.opts.group):
+            raise ValueError("%s is not valid for group name" % self.opts.group)
+        # TODO: paths and gecos
+        return Command.sanitizeOptions(self)
+
     def formatAsGetent(self,entry):
         out = []
         out += [entry.getSingleValue('uid')]
@@ -52,6 +64,28 @@ class User(Command):
         out += [entry.getSingleValue('loginShell')]
 
         return ":".join([x if x is not None else "" for x in out])
+
+    def locateFirstUser(self):
+        user = None
+        if len(self.args) > 0:
+            user = self.args[0]
+            if not self.checkPosixName(user):
+                raise ValueError("User name %s invalid" % user)
+            entries = self.search('(&(sAMAccountName=%s)(objectClass=user))' % user)
+            if len(entries) > 1:
+                self.result("Error: %d matching users for %s" % (len(entries),user))
+            if len(entries) == 1:
+                self.args = self.args[1:]
+                return user,entries[0]
+
+        if self.opts.uid is not None:
+            entries = self.search('(&(objectClass=posixAccount)(uidNumber=%s)(objectClass=user))' % self.opts.uid)
+            if len(entries) > 1:
+                self.result("Error: %d matching users for %s" % (len(entries),self.opts.uid))
+            if len(entries) == 1:
+                return entries[0].getSingleValue('sAMAccountName'), entries[0]
+
+        return None, None
 
     def do_show(self):
         if len(self.args) > 0:
@@ -87,3 +121,47 @@ class User(Command):
         accounts = self.search('(objectClass=posixAccount)')
         for entry in accounts:
             self.result(self.formatAsGetent(entry))
+
+    def locateGroupByGID(self,gid):
+        if not self.checkPOSIXID(gid):
+            return None
+        entries = self.search('(&(objectClass=group)(objectClass=posixGroup)(gidNumber=%s))' % gid)
+        if len(entries) < 1:
+            return None
+        if len(entries) == 1:
+            return entries[0]
+        self.error("There are multiple groups for gid: %s" % gid)
+        return None
+
+    def do_id(self):
+        user, entry = self.locateFirstUser()
+        if user is None:
+            self.error("No user specified!")
+            return
+
+        uid = entry.getSingleValue('uidNumber')
+        if uid is None: uid = '*'
+        out = "uid=%s(%s)" % (uid,user)
+        gid = entry.getSingleValue('primaryGroupID')
+        if gid is None:
+            out += " gid=*"
+        else:
+            group = self.locateGroupByGID(gid)
+            if group is None:
+                out += " gid=%s(*)" % gid
+            else:
+                gname = group.getSingleValue('sAMAccountName')
+                out += " gid=%s(%s)" % (gid,gname)
+
+        # TODO: posixGroup !?
+        entries = self.search('(&(objectClass=group)(member=%s))' % entry.dn())
+        groups = []
+        for group in entries:
+            gid = group.getSingleValue('gidNumber')
+            name = group.getSingleValue('sAMAccountName')
+            if gid is None: gid = '*'
+            groups += ["%s(%s)" % (gid,name)]
+        if len(groups) > 0:
+            out += " Groups=" + ",".join(groups)
+
+        self.result(out)
