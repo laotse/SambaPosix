@@ -51,6 +51,19 @@ class User(Command):
             return None
         return entry[att][0]
 
+    def formatAsGetent(self,entry):
+        out = []
+        out += [self.getPosixAttribute(entry, 'uid')]
+        out += ['x']
+        out += [self.getPosixAttribute(entry, 'uidNumber')]
+        out += [self.getPosixAttribute(entry, 'primaryGroupID')]
+        out += [self.getPosixAttribute(entry, 'gecos')]
+        out += [self.getPosixAttribute(entry, 'unixHomeDirectory')]
+        out += [self.getPosixAttribute(entry, 'loginShell')]
+
+        return ":".join([x if x is not None else "" for x in out])
+
+
     def do_show(self):
         if len(self.args) > 0:
             accounts = self.args
@@ -60,7 +73,7 @@ class User(Command):
         if accounts is None and self.opts.uid is not None:
             entries = self.search('(&(objectClass=posixAccount)(uidNumber=%s))' % self.opts.uid)
             accounts = []
-            for dn, record in entries:
+            for _, record in entries:
                 if 'sAMAccountName' in record:
                     accounts += record['sAMAccountName']
         if accounts is None:
@@ -73,21 +86,15 @@ class User(Command):
             elif len(entries) > 1:
                 self.result("Error: %d matching users for %s" % (len(entries),user))
             else:
-                dn, entry = entries[0]
+                _, entry = entries[0]
                 if not self.checkValue(entry, 'objectClass', 'posixAccount'):
                     self.result("%s: no POSIX extensions" % user)
                 else:
-                    out = []
-                    out += [self.getPosixAttribute(entry, 'uid')]
-                    out += ['x']
-                    out += [self.getPosixAttribute(entry, 'uidNumber')]
-                    out += [self.getPosixAttribute(entry, 'primaryGroupID')]
-                    out += [self.getPosixAttribute(entry, 'gecos')]
-                    out += [self.getPosixAttribute(entry, 'unixHomeDirectory')]
-                    out += [self.getPosixAttribute(entry, 'loginShell')]
-
-                    self.result(":".join([x if x is not None else "" for x in out]))
+                    self.result(self.formatAsGetent(entry))
                     if 'userPassword' in entry or 'unixUserPassword' in entry:
                         self.result("#%s has unix password entries set!" % user)
 
-
+    def do_getent(self):
+        accounts = self.search('(objectClass=posixAccount)')
+        for _, entry in accounts:
+            self.result(self.formatAsGetent(entry))
