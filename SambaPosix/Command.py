@@ -57,12 +57,6 @@ class Command(object):
 
         raise ValueError("Unknown command %s" % " ".join(self.CommandPath))
 
-    def connect(self):
-        auth = ldap.sasl.gssapi("")
-        self.LDAP = ldap.initialize(self.opts.url)
-        self.LDAP.sasl_interactive_bind_s("",auth)
-        self.trace("Connected to %s" % self.opts.url)
-
     def error(self,msg):
         indent = len(self.program_name) * " "
         sys.stderr.write(self.program_name + ": " + msg + "\n")
@@ -75,6 +69,12 @@ class Command(object):
     def result(self,msg):
         sys.stdout.write(msg + '\n')
 
+    def connect(self):
+        auth = ldap.sasl.gssapi("")
+        self.LDAP = ldap.initialize(self.opts.url)
+        self.LDAP.sasl_interactive_bind_s("",auth)
+        self.trace("Connected to %s" % self.opts.url)
+
     def search(self,query):
         if self.LDAP is None:
             self.connect()
@@ -83,3 +83,14 @@ class Command(object):
         # we get those strange results without DN - referrals?
         results = [LDAPEntry(x) for x in results if x[0] is not None]
         return results
+
+    def readDN(self,dn):
+        if self.LDAP is None:
+            self.connect()
+        self.trace("Read entry %s" % (dn))
+        results = self.LDAP.search_s(dn, ldap.SCOPE_BASE)
+        if len(results) > 1:
+            raise IndexError("Reading DN %s yielded %d results" % (dn, len(results)))
+        if len(results) < 1:
+            return None
+        return LDAPEntry(results[0])
