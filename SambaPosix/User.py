@@ -35,8 +35,8 @@ class User(Command):
         group = OptionGroup(parser,"Posix user accounts")
         group.add_option("-u", "--uid", dest="uid", help="set numerical user ID", metavar="UID")
         group.add_option("-U", "--user", dest="user", help="choose user name", metavar="NAME")
-        group.add_option("-g", "--gid", dest="gid", help="set numerical group ID of primary group", metavar="GID")
-        group.add_option("-G", "--group", dest="group", help="set group name of primary group", metavar="NAME")
+        group.add_option("-g", "--gid", dest="gid", help="set numerical group ID of login group", metavar="GID")
+        group.add_option("-G", "--group", dest="group", help="set group name of login group", metavar="NAME")
         group.add_option("", "--gecos", dest="gecos", help="set gecos", metavar="NAME")
         group.add_option("", "--shell", dest="shell", help="set shell", metavar="PATH")
         group.add_option("", "--home", dest="home", help="set home directory", metavar="PATH")
@@ -65,7 +65,7 @@ class User(Command):
         out += [entry.getSingleValue('uid')]
         out += ['x']
         out += [entry.getSingleValue('uidNumber')]
-        out += [entry.getSingleValue('primaryGroupID')]
+        out += [entry.getSingleValue('gidNumber')]
         out += [entry.getSingleValue('gecos')]
         out += [entry.getSingleValue('unixHomeDirectory')]
         out += [entry.getSingleValue('loginShell')]
@@ -149,7 +149,7 @@ class User(Command):
         uid = entry.getSingleValue('uidNumber')
         if uid is None: uid = '*'
         out = "uid=%s(%s)" % (uid,user)
-        gid = entry.getSingleValue('primaryGroupID')
+        gid = entry.getSingleValue('gidNumber')
         if gid is None:
             out += " gid=*"
         else:
@@ -195,7 +195,8 @@ class User(Command):
         modify += [self.makeModify(entry, user, 'uid')]
 
         modify += [self.makeModify(entry, self.opts.uid, 'uidNumber')]
-        modify += [self.makeModify(entry, self.opts.gid, 'primaryGroupID')]
+        # TODO: auto-add user to group, if gid is given?
+        modify += [self.makeModify(entry, self.opts.gid, 'gidNumber')]
         modify += [self.makeModify(entry, self.opts.home, 'unixHomeDirectory')]
         modify += [self.makeModify(entry, self.opts.shell, 'loginShell')]
         modify += [self.makeModify(entry, self.opts.gecos, 'gecos')]
