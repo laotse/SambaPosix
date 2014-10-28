@@ -18,10 +18,26 @@ class Logger(object):
     __metaclass__ = Singleton
 
     def log(self, msg):
-        sys.stderr.write(msg + '\n')
+        if hasattr(self, 'fh') and self.fh is not None:
+            self.fh.write(msg + '\n')
+        else:
+            sys.stderr.write(msg + '\n')
 
     def setVerbosity(self, level):
         self.Verbosity = level
+
+    def setFile(self, name):
+        try:
+            self.fh.close()
+        except:
+            pass
+        try:
+            self.fh = open(name,'w')
+        except IOError, e:
+            self.fh = None
+            self.error("Cannot open file %s for logging: %s" %(name,str(e)))
+            return False
+        return True
 
     def conditionalLog(self, msg, level):
         if not hasattr(self, 'Verbosity'):

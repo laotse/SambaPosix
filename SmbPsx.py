@@ -14,6 +14,7 @@ Toolsuite to manage POSIX users in an AD
 @contact:    debian@lhanke.de
 @deffield    updated: Updated
 '''
+from SambaPosixLib.Logger import Logger
 
 from SambaPosixLib.LDAPQuery import LDAPQuery
 from SambaPosixLib.LDAPConf import LDAPConf
@@ -58,7 +59,7 @@ def main(argv = None):
     group = OptionGroup(parser,"General options")
     group.add_option("-v", "--verbose", dest="verbose", action="count", help="set verbosity level [default: %default]")
     group.add_option("-n", "--dry", dest="dry_run", action="store_true", help="do not modify LDAP, just show what would be done")
-    #group.add_option("-o", "--log", dest="logfile", help="set logfile path and enable logging", metavar="FILE")
+    group.add_option("-o", "--log", dest="logfile", help="set logfile path and enable logging", metavar="FILE")
     group.add_option("-H", "--url", dest="url", help="URL of AD DC [default: %default]", metavar="URL")
     group.add_option("-b", "--base", dest="base", help="Base DN [default: %default]", metavar="DN")
     group.add_option("-U", "--bind-user", dest="bind_user", help="User for simple bind", metavar="CN | uid")
@@ -69,6 +70,10 @@ def main(argv = None):
     oConfig.setBase(opts.base)
     oConfig.setURI(opts.url)
     oConfig.setTLS(not opts.noTLS)
+    log = Logger()
+    if opts.logfile is not None:
+        log.setFile(opts.logfile)
+    log.setVerbosity(opts.verbose)
 
     if isinstance(opts.bind_user, str):
         oLDAP = LDAPQuery(oConfig, opts.bind_user)
@@ -77,7 +82,7 @@ def main(argv = None):
 
     user = User.byAccount('mac', oLDAP)
     if not user is False:
-        user.dump(0)
+        print user.formatAsGetent()
 
 if __name__ == '__main__':
     import pprint
