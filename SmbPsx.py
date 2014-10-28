@@ -37,7 +37,7 @@ def main(argv = None):
     program_build_date = "%s" % __updated__
 
     program_version_string = '%%prog %s (%s)' % (program_version, program_build_date)
-    # program_usage = "usage: %s cmd [options]" % program_name
+    program_usage = "usage: %s cmd [options]" % program_name
     program_longdesc = '''''' # optional - give further explanation about what the program does
     program_license = "Copyright 2014 Dr. Lars Hanke (µAC - Microsystem Accessory Consult)                                            \
                 Licensed under the GNU Public License v3\nhttp://www.gnu.org/licenses/gpl-3.0.html"
@@ -47,7 +47,7 @@ def main(argv = None):
 
     # setup option parser
     parser = OptionParser(version=program_version_string, epilog=program_longdesc, description=program_license)
-    #parser.set_usage(program_usage)
+    parser.set_usage(program_usage)
     # set defaults
     oConfig = LDAPConf()
     if os.path.isfile('/etc/ldap/ldap.conf'):
@@ -80,11 +80,19 @@ def main(argv = None):
     else:
         oLDAP = LDAPQuery(oConfig)
 
-    user = User.byAccount('mac', oLDAP)
-    if not user is False:
-        print user.formatAsGetent()
-
+    if len(args) <= 0:
+        parser.error('missing command, try "help"')
+        return 5
+    if args[0] == 'user':
+        user = User.byAccount('mac', oLDAP)
+        if not user is False:
+            print user.formatAsGetent()
+        return 0
+    elif args[0] == 'help':
+        parser.error("supported commands: user help")
+        return 0
+    else:
+        parser.error("Unknown command: %s" % args[0])
+        return 5
 if __name__ == '__main__':
-    import pprint
-
-    main()
+    sys.exit(main())
