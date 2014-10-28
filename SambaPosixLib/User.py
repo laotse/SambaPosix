@@ -30,3 +30,15 @@ class User(LDAPEntry):
             return False
 
         return cls(results[0])
+
+    def formatAsGetent(self):
+        out = []
+        out += [self.getSingleValue('uid')]
+        out += ['x']
+        out += [self.getSingleValue('uidNumber')]
+        out += [self.getSingleValue('gidNumber')]
+        out += [self.getSingleValue('gecos')]
+        out += [self.getSingleValue('unixHomeDirectory')]
+        out += [self.getSingleValue('loginShell')]
+
+        return ":".join([x if x is not None else "" for x in out])
