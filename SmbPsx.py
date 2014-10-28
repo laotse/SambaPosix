@@ -18,6 +18,8 @@ Toolsuite to manage POSIX users in an AD
 from SambaPosixLib.LDAPQuery import LDAPQuery
 from SambaPosixLib.LDAPConf import LDAPConf
 
+from SambaPosixLib.User import User
+
 import sys,os
 from optparse import OptionParser, OptionGroup
 
@@ -73,15 +75,11 @@ def main(argv = None):
     else:
         oLDAP = LDAPQuery(oConfig)
 
-    results = oLDAP.search("(&(objectClass=user)(sAMAccountName=mac))", True)
-    return results
+    user = User.byAccount('mac', oLDAP)
+    if not user is False:
+        user.dump(0)
 
 if __name__ == '__main__':
     import pprint
 
-    results = main()
-    if results is None:
-        sys.exit()
-
-    pp = pprint.PrettyPrinter()
-    pp.pprint(results)
+    main()

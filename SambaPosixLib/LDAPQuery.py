@@ -55,7 +55,7 @@ class LDAPQuery(object):
         except ldap.LDAPError, e:
             self.LDAP = None
             self.Anonymous = True
-            log.error(e)
+            log.error("Could not authenticate to AD -- did you do a kinit?\n" + str(e))
             return False
         self.Anonymous = False
         log = Logger()
