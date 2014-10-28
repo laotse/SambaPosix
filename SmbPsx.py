@@ -1,24 +1,85 @@
+#!/usr/bin/env python
+# encoding: utf-8
 '''
-Created on 28.10.2014
+ -- shortdesc
 
-@author: mgr
+Toolsuite to manage POSIX users in an AD
+
+@author:     Dr. Lars Hanke
+
+@copyright:  2014 µAC - Microsystem Accessory Consult. All rights reserved.
+
+@license:    GPLv3
+
+@contact:    debian@lhanke.de
+@deffield    updated: Updated
 '''
 
 from SambaPosixLib.LDAPQuery import LDAPQuery
 from SambaPosixLib.LDAPConf import LDAPConf
 
-import sys,pprint,os
+import sys,os
+from optparse import OptionParser, OptionGroup
+
+__all__ = []
+__version__ = 0.1
+__date__ = '2014-09-11'
+__updated__ = '2014-10-28'
+
+def main(argv = None):
+    '''Command line options.'''
+
+    program_name = os.path.basename(sys.argv[0])
+    program_version = "v0.1"
+    program_build_date = "%s" % __updated__
+
+    program_version_string = '%%prog %s (%s)' % (program_version, program_build_date)
+    # program_usage = "usage: %s cmd [options]" % program_name
+    program_longdesc = '''''' # optional - give further explanation about what the program does
+    program_license = "Copyright 2014 Dr. Lars Hanke (µAC - Microsystem Accessory Consult)                                            \
+                Licensed under the GNU Public License v3\nhttp://www.gnu.org/licenses/gpl-3.0.html"
+
+    if argv is None:
+        argv = sys.argv[1:]
+
+    # setup option parser
+    parser = OptionParser(version=program_version_string, epilog=program_longdesc, description=program_license)
+    #parser.set_usage(program_usage)
+    # set defaults
+    oConfig = LDAPConf()
+    if os.path.isfile('/etc/ldap/ldap.conf'):
+        oConfig.parseConf('/etc/ldap/ldap.conf')
+        oConfig.extendBase("CN=Users,")
+
+    parser.set_defaults(base=oConfig.Base, url=oConfig.URI, dry_run=False, verbose=0, bind_user=None)
+
+    group = OptionGroup(parser,"General options")
+    group.add_option("-v", "--verbose", dest="verbose", action="count", help="set verbosity level [default: %default]")
+    group.add_option("-n", "--dry", dest="dry_run", action="store_true", help="do not modify LDAP, just show what would be done")
+    #group.add_option("-o", "--log", dest="logfile", help="set logfile path and enable logging", metavar="FILE")
+    group.add_option("-H", "--url", dest="url", help="URL of AD DC [default: %default]", metavar="URL")
+    group.add_option("-b", "--base", dest="base", help="Base DN [default: %default]", metavar="DN")
+    group.add_option("-U", "--bind-user", dest="bind_user", help="User for simple bind", metavar="CN | uid")
+    group.add_option("", "--no-tls", dest="noTLS", action="store_true", help="Don't use TLS for simple bind")
+    parser.add_option_group(group)
+
+    (opts, args) = parser.parse_args(argv)
+    oConfig.setBase(opts.base)
+    oConfig.setURI(opts.url)
+    oConfig.setTLS(not opts.noTLS)
+
+    if isinstance(opts.bind_user, str):
+        oLDAP = LDAPQuery(oConfig, opts.bind_user)
+    else:
+        oLDAP = LDAPQuery(oConfig)
+
+    results = oLDAP.search("(&(objectClass=user)(sAMAccountName=mac))", True)
+    return results
 
 if __name__ == '__main__':
-    LC = LDAPConf()
-    if os.path.isfile('/etc/ldap/ldap.conf'):
-        LC.parseConf('/etc/ldap/ldap.conf')
-        LC.extendBase("CN=Users,")
-    # Kerberos bind
-    LQ = LDAPQuery(LC)
-    # simple bind
-    #LQ = LDAPQuery("ldap://samba.ad.microsult.de","CN=Users,DC=ad,DC=microsult,DC=de", False, "Administrator")
-    results = LQ.search("(&(objectClass=user)(sAMAccountName=mgr))", True)
+    import pprint
+
+    results = main()
     if results is None:
         sys.exit()
 
