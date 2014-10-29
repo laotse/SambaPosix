@@ -17,6 +17,11 @@ class Command(object):
         self.args = args[1:]
         self.opts = opts
         self.LDAP = oLDAP
+        self.command = None
+
+    @classmethod
+    def optionGroup(cls, parser):
+        return parser
 
     @classmethod
     def run(cls,args,opts,oLDAP):

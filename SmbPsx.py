@@ -40,7 +40,7 @@ def main(argv = None):
     program_usage = "usage: %s cmd [options]" % program_name
     program_longdesc = '''''' # optional - give further explanation about what the program does
     program_license = "Copyright 2014 Dr. Lars Hanke (µAC - Microsystem Accessory Consult)                                            \
-                Licensed under the GNU Public License v3\nhttp://www.gnu.org/licenses/gpl-3.0.html"
+                Licensed under the GNU Public License v3\nhttp://www.gnu.org/licenses/gpl-3.0.html".decode('utf8')
 
     if argv is None:
         argv = sys.argv[1:]
@@ -65,6 +65,8 @@ def main(argv = None):
     group.add_option("-U", "--bind-user", dest="bind_user", help="User for simple bind", metavar="CN | uid")
     group.add_option("", "--no-tls", dest="noTLS", action="store_true", help="Don't use TLS for simple bind")
     parser.add_option_group(group)
+
+    parser = ManageUsers.optionGroup(parser)
 
     (opts, args) = parser.parse_args(argv)
     oConfig.setBase(opts.base)
