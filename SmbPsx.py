@@ -19,7 +19,7 @@ from SambaPosixLib.Logger import Logger
 from SambaPosixLib.LDAPQuery import LDAPQuery
 from SambaPosixLib.LDAPConf import LDAPConf
 
-from SambaPosixLib.User import User
+from SambaPosixLib.ManageUsers import ManageUsers
 
 import sys,os
 from optparse import OptionParser, OptionGroup
@@ -84,10 +84,7 @@ def main(argv = None):
         parser.error('missing command, try "help"')
         return 5
     if args[0] == 'user':
-        user = User.byAccount('mac', oLDAP)
-        if not user is False:
-            print user.formatAsGetent()
-        return 0
+        return ManageUsers.run(args,opts,oLDAP)
     elif args[0] == 'help':
         parser.error("supported commands: user help")
         return 0
