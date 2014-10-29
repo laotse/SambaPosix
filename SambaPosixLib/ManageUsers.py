@@ -5,17 +5,18 @@ Created on 29.10.2014
 '''
 from optparse import OptionGroup
 
-from SambaPosixLib.Command import Command
+from SambaPosixLib.Command import Command, InvalidCommand
 from SambaPosixLib.User import User
 
 class ManageUsers(Command):
     '''
     classdocs
     '''
+    Command = "user"
 
     def __init__(self,args,opts,oLDAP):
+        self._setupUsage("user", False)
         Command.__init__(self, args, opts, oLDAP)
-        self.command = "user"
 
     @classmethod
     def optionGroup(cls, parser):
@@ -30,8 +31,23 @@ class ManageUsers(Command):
         parser.add_option_group(group)
         return parser
 
+    def usage(self, msg):
+        indent = " " * 3
+        out = msg + "\n\n"
+        out += self.Usage + "\n"
+        out += indent + "getent [user] - getent for one or all POSIX users" + "\n"
+        out += indent + "help - this help page"
+        return out
+
     def do_run(self):
-        user = User.byAccount('mac', self.LDAP)
-        if not user is False:
-            print user.formatAsGetent()
-        return 0
+        if len(self.args) < 1:
+            raise InvalidCommand("user requires sub-commands")
+        if self.args[0] == "getent":
+            user = User.byAccount('mac', self.LDAP)
+            if not user is False:
+                print user.formatAsGetent()
+            return 0
+        if self.args[0] == "getent":
+            self.print_usage("user help", False)
+            return 0
+        raise InvalidCommand("user %s unknown" % self.args[0])

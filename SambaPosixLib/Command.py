@@ -4,6 +4,11 @@ Created on 29.10.2014
 @author: mgr
 '''
 
+import sys, os
+
+class InvalidCommand(Exception):
+    pass
+
 class Command(object):
     '''
     classdocs
@@ -18,6 +23,8 @@ class Command(object):
         self.opts = opts
         self.LDAP = oLDAP
         self.command = None
+        if self.Usage is None:
+            self._setupUsage("", False)
 
     @classmethod
     def optionGroup(cls, parser):
@@ -30,3 +37,16 @@ class Command(object):
 
     def do_run(self):
         raise NotImplementedError("Please implement the main handler for %s" % self.__class__.__name__)
+
+    def _setupUsage(self, path, leaf = False):
+        program_name = os.path.basename(sys.argv[0])
+        if not leaf:
+            self.Usage = "usage: %s %s cmd [options]" % (program_name, path)
+        else:
+            self.Usage = "usage: %s %s [options]" % (program_name, path)
+
+    def print_usage(self, msg, fail=False):
+        if not fail:
+            print msg
+        else:
+            sys.stderr.write(msg)

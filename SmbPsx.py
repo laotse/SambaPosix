@@ -20,6 +20,7 @@ from SambaPosixLib.LDAPQuery import LDAPQuery
 from SambaPosixLib.LDAPConf import LDAPConf
 
 from SambaPosixLib.ManageUsers import ManageUsers
+from SambaPosixLib.Command import InvalidCommand
 
 import sys,os
 from optparse import OptionParser, OptionGroup
@@ -41,6 +42,8 @@ def main(argv = None):
     program_longdesc = '''''' # optional - give further explanation about what the program does
     program_license = "Copyright 2014 Dr. Lars Hanke (µAC - Microsystem Accessory Consult)                                            \
                 Licensed under the GNU Public License v3\nhttp://www.gnu.org/licenses/gpl-3.0.html".decode('utf8')
+
+    program_modules = [ManageUsers]
 
     if argv is None:
         argv = sys.argv[1:]
@@ -66,7 +69,8 @@ def main(argv = None):
     group.add_option("", "--no-tls", dest="noTLS", action="store_true", help="Don't use TLS for simple bind")
     parser.add_option_group(group)
 
-    parser = ManageUsers.optionGroup(parser)
+    for module in program_modules:
+        parser = module.optionGroup(parser)
 
     (opts, args) = parser.parse_args(argv)
     oConfig.setBase(opts.base)
@@ -85,13 +89,19 @@ def main(argv = None):
     if len(args) <= 0:
         parser.error('missing command, try "help"')
         return 5
-    if args[0] == 'user':
-        return ManageUsers.run(args,opts,oLDAP)
-    elif args[0] == 'help':
-        parser.error("supported commands: user help")
-        return 0
-    else:
+    try:
+        if args[0] == 'help':
+            parser.error("supported commands: user help")
+            return 0
+        for module in program_modules:
+            if args[0] == module.Command:
+                return module.run(args,opts,oLDAP)
+
         parser.error("Unknown command: %s" % args[0])
         return 5
+    except InvalidCommand, e:
+        print "Invalid Command!"
+        return 5
+
 if __name__ == '__main__':
     sys.exit(main())
