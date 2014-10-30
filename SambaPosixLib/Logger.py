@@ -23,6 +23,11 @@ class Logger(object):
         else:
             sys.stderr.write(msg + '\n')
 
+    def result(self, msg):
+        if hasattr(self, 'fh') and self.fh is not None:
+            self.fh.write(msg + '\n')
+        sys.stdout.write(msg + "\n")
+
     def setVerbosity(self, level):
         self.Verbosity = level
 
