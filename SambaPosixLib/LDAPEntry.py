@@ -20,6 +20,10 @@ class LDAPEntry(object):
             # This is a DN only
             self.dn(entry)
             self.Attributes = []
+        elif isinstance(entry, LDAPEntry):
+            # copy CTOR or cast
+            self.dn(entry.dn())
+            self.Attributes = entry.Attributes
         elif isinstance(entry, (tuple,list)) and len(entry) == 2:
             self.dn(entry[0])
             self.Attributes = entry[1]

@@ -5,6 +5,7 @@ Created on 29.10.2014
 '''
 
 import sys, os
+from SambaPosixLib.Logger import Logger
 
 class InvalidCommand(Exception):
     pass
@@ -25,6 +26,7 @@ class Command(object):
         self.command = None
         if self.Usage is None:
             self._setupUsage("", False)
+        self.Logger = Logger()
 
     @classmethod
     def optionGroup(cls, parser):

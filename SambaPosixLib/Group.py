@@ -18,6 +18,7 @@ class Group(LDAPEntry):
         Constructor
         '''
         LDAPEntry.__init__(self,entry)
+        self.Logger = Logger()
 
     @classmethod
     def byName(cls, name, oLDAP):
@@ -58,3 +59,46 @@ class Group(LDAPEntry):
         entries = oLDAP.search('(&(objectClass=group)(member=%s))' % dn)
         for group in entries:
             yield cls(group)
+
+    @classmethod
+    def posixGroups(cls, oLDAP):
+        log = Logger()
+        entries = oLDAP.search('(objectClass=posixGroup)', True)
+        if entries is None:
+            log.trace("No valid POSIX groups found!")
+            raise StopIteration
+        for group in entries:
+            yield cls(group)
+
+    def resolveMembers(self, oLDAP, recursive = True):
+        members = []
+        for dn in self.values('member'):
+            member = oLDAP.readDN(dn)
+            if member is None:
+                self.Logger.error("Group member %s does not exist" % dn)
+            else:
+                member = LDAPEntry(member)
+                if member.hasAttribute('objectClass','user'):
+                    if member.hasAttribute('objectClass','posixAccount'):
+                        t = member.getSingleValue('uid')
+                        if t is None:
+                            t = member.getSingleValue('sAMAccountName')
+                        members += [t]
+                    else:
+                        members += ['*' + member.getSingleValue('sAMAccountName')]
+                elif member.hasAttribute('objectClass','group') and recursive:
+                    member = self(member)
+                    members += member.resolveMembers(oLDAP, recursive)
+        return members
+
+    def formatAsGetent(self, oLDAP):
+        out = []
+        out += [self.getSingleValue('sAMAccountName')]
+        out += ['*']
+        out += [self.getSingleValue('gidNumber')]
+        members = self.resolveMembers(oLDAP)
+        members = ",".join(members)
+        if 'memberUid' in self:
+            members += " ("+",".join(self.values('memberUid'))+")"
+        out += [members]
+        return ":".join([x if x is not None else "" for x in out])

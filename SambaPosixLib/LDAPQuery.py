@@ -24,6 +24,7 @@ class LDAPQuery(object):
             self.user = user
         else:
             self.user = None
+        self.Logger = Logger()
 
     def _bindAnonymous(self):
         log = Logger()
@@ -101,3 +102,15 @@ class LDAPQuery(object):
             log.error(error)
             return None
         return results
+
+    def readDN(self, dn, privileged = False):
+        if not self.connect(privileged):
+            return None
+
+        self.Logger.trace("Read entry %s" % (dn))
+        results = self.LDAP.search_s(dn, ldap.SCOPE_BASE)
+        if len(results) > 1:
+            raise IndexError("Reading DN %s yielded %d results" % (dn, len(results)))
+        if len(results) < 1:
+            return None
+        results[0]
