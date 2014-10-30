@@ -5,6 +5,7 @@ Created on 29.10.2014
 '''
 from optparse import OptionGroup
 
+from SambaPosixLib.Logger import Logger
 from SambaPosixLib.Command import Command, InvalidCommand
 from SambaPosixLib.User import User
 
@@ -39,15 +40,23 @@ class ManageUsers(Command):
         out += indent + "help - this help page"
         return out
 
+    def do_getent(self):
+        if len(self.args) > 1:
+            user = User.byAccount(self.args[1], self.LDAP)
+            if user is False:
+                log = Logger()
+                log.error("User %s does not exist!" % self.args[1])
+                return 1
+            print user.formatAsGetent()
+            return 0
+        raise InvalidCommand("getent requires a user")
+
     def do_run(self):
         if len(self.args) < 1:
             raise InvalidCommand("user requires sub-commands")
         if self.args[0] == "getent":
-            user = User.byAccount('mac', self.LDAP)
-            if not user is False:
-                print user.formatAsGetent()
-            return 0
-        if self.args[0] == "getent":
+            return self.do_getent()
+        if self.args[0] == "help":
             self.print_usage("user help", False)
             return 0
         raise InvalidCommand("user %s unknown" % self.args[0])

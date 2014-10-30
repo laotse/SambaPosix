@@ -33,7 +33,13 @@ class Command(object):
     @classmethod
     def run(cls,args,opts,oLDAP):
         oCls = cls(args,opts,oLDAP)
-        return oCls.do_run()
+        return oCls._do_run()
+
+    def _do_run(self):
+        try:
+            return self.do_run()
+        except InvalidCommand, e:
+            raise InvalidCommand(self.usage(str(e)))
 
     def do_run(self):
         raise NotImplementedError("Please implement the main handler for %s" % self.__class__.__name__)

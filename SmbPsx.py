@@ -100,7 +100,7 @@ def main(argv = None):
         parser.error("Unknown command: %s" % args[0])
         return 5
     except InvalidCommand, e:
-        print "Invalid Command!"
+        print str(e)
         return 5
 
 if __name__ == '__main__':
