@@ -49,7 +49,9 @@ class ManageUsers(Command):
                 return 1
             print user.formatAsGetent()
             return 0
-        raise InvalidCommand("getent requires a user")
+        for user in User.posixUsers(self.LDAP):
+            print user.formatAsGetent()
+        return 0
 
     def do_run(self):
         if len(self.args) < 1:

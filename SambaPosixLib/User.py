@@ -31,6 +31,12 @@ class User(LDAPEntry):
 
         return cls(results[0])
 
+    @classmethod
+    def posixUsers(cls,oLDAP):
+        results = oLDAP.search('(objectClass=posixAccount)', True)
+        for result in results:
+            yield cls(result)
+
     def formatAsGetent(self):
         out = []
         out += [self.getSingleValue('uid')]
