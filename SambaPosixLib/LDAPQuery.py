@@ -113,4 +113,4 @@ class LDAPQuery(object):
             raise IndexError("Reading DN %s yielded %d results" % (dn, len(results)))
         if len(results) < 1:
             return None
-        results[0]
+        return results[0]
