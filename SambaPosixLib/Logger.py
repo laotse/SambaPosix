@@ -28,6 +28,9 @@ class Logger(object):
             self.fh.write(msg + '\n')
         sys.stdout.write(msg + "\n")
 
+    def ldif(self, msg):
+        return self.result(msg)
+
     def setVerbosity(self, level):
         self.Verbosity = level
 

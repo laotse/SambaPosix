@@ -3,6 +3,8 @@ Created on 28.10.2014
 
 @author: mgr
 '''
+import ldap.dn
+
 from SambaPosixLib.LDAPEntry import LDAPEntry
 from SambaPosixLib.Logger import Logger
 from SambaPosixLib.PosixValidator import PosixValidator as Validator
@@ -40,6 +42,22 @@ class User(LDAPEntry):
         results = oLDAP.search('(objectClass=posixAccount)', True)
         for result in results:
             yield cls(result)
+
+    @classmethod
+    def byDN(cls, dn, oLDAP):
+        try:
+            ldap.dn.str2dn(dn)
+        except ldap.DECODING_ERROR:
+            # this is not a valid DN, so we accept it as user name
+            dn = ldap.dn.escape_dn_chars(dn)
+            dn = "CN=" + dn + "," + oLDAP.Base
+        result = oLDAP.readDN(dn, True)
+        if result is None:
+            log = Logger()
+            log.trace("No entries found for DN: %s" % dn)
+            return False
+
+        return cls(result)
 
     def formatAsGetent(self):
         out = []
