@@ -3,7 +3,6 @@ Created on 29.10.2014
 
 @author: mgr
 '''
-from optparse import OptionGroup
 
 from SambaPosixLib.Logger import Logger
 from SambaPosixLib.Command import Command, InvalidCommand
@@ -17,22 +16,33 @@ class ManageUsers(Command):
     '''
     Command = "user"
 
-    def __init__(self,args,opts,oLDAP):
+    def __init__(self,opts,oLDAP):
         self._setupUsage("user", False)
-        Command.__init__(self, args, opts, oLDAP)
+        Command.__init__(self, opts, oLDAP)
+        self.command = opts['command']
 
     @classmethod
-    def optionGroup(cls, parser):
-        group = OptionGroup(parser,"Options for Posix user accounts")
-        group.add_option("-u", "--uid", dest="uid", help="set numerical user ID", metavar="UID")
-        group.add_option("", "--user", dest="user", help="choose user name", metavar="NAME")
-        group.add_option("-g", "--gid", dest="gid", help="set numerical group ID of login group", metavar="GID")
-        group.add_option("-G", "--group", dest="group", help="set group name of login group", metavar="NAME")
-        group.add_option("", "--gecos", dest="gecos", help="set gecos", metavar="NAME")
-        group.add_option("", "--shell", dest="shell", help="set shell", metavar="PATH")
-        group.add_option("", "--home", dest="home", help="set home directory", metavar="PATH")
-        parser.add_option_group(group)
-        return parser
+    def optionGroup(cls, subparsers):
+        modparse = subparsers.add_parser('user', help='user management')
+        #group = OptionGroup(parser,"Options for Posix user accounts")
+        modparsers = modparse.add_subparsers(dest="command")
+        set_parser = modparsers.add_parser('set', help='set POSIX attributes to user')
+        set_parser.add_argument("user", help="user to modify")
+        set_parser.add_argument("-u", "--uid", dest="uid", help="set / use numerical user ID", metavar="UID")
+        set_parser.add_argument("--user", dest="user", help="choose user name", metavar="NAME")
+        set_parser.add_argument("-g", "--gid", dest="gid", help="set numerical group ID of login group", metavar="GID")
+        set_parser.add_argument("-G", "--group", dest="group", help="set group name of login group", metavar="NAME")
+        set_parser.add_argument("--gecos", dest="gecos", help="set gecos", metavar="NAME")
+        set_parser.add_argument("--shell", dest="shell", help="set shell", metavar="PATH")
+        set_parser.add_argument("--home", dest="home", help="set home directory", metavar="PATH")
+
+        id_parser = modparsers.add_parser('id', help='get id like output for one or more users')
+        id_parser.add_argument("user", nargs='+', help="user to show")
+
+        get_parser = modparsers.add_parser("getent", help="get getent like output for one, more, or all POSIX users")
+        get_parser.add_argument("user", nargs='*', help="user to list")
+        #parser.add_option_group(group)
+        return True
 
     def usage(self, msg):
         indent = " " * 3
@@ -44,13 +54,14 @@ class ManageUsers(Command):
         return out
 
     def do_getent(self):
-        if len(self.args) > 1:
-            user = User.byAccount(self.args[1], self.LDAP)
-            if user is False:
-                log = Logger()
-                log.error("User %s does not exist!" % self.args[1])
-                return 1
-            print user.formatAsGetent()
+        if len(self.opts['user']) > 1:
+            for name in self.opts['user']:
+                user = User.byAccount(name, self.LDAP)
+                if user is False:
+                    log = Logger()
+                    log.error("User %s does not exist!" % name)
+                    return 1
+                print user.formatAsGetent()
             return 0
         for user in User.posixUsers(self.LDAP):
             print user.formatAsGetent()
@@ -58,12 +69,10 @@ class ManageUsers(Command):
 
     def do_id(self):
         log = Logger()
-        if len(self.args) < 2:
-            raise InvalidCommand("user id requires a user name")
-        for name in self.args[1:]:
+        for name in self.opts['user']:
             user = User.byAccount(name, self.LDAP)
             if user is False:
-                log.error("User %s does not exist!" % self.args[1])
+                log.error("User %s does not exist!" % name)
                 return 1
 
             uid = user.getSingleValue('uidNumber')
@@ -96,14 +105,9 @@ class ManageUsers(Command):
         return 0
 
     def do_run(self):
-        if len(self.args) < 1:
-            raise InvalidCommand("user requires sub-commands")
-        if self.args[0] == "getent":
+        if self.command == "getent":
             return self.do_getent()
-        if self.args[0] == "id":
+        if self.command == "id":
             return self.do_id()
-        if self.args[0] == "help":
-            self.print_usage("user help", False)
-            return 0
-        raise InvalidCommand("user %s unknown" % self.args[0])
+        raise InvalidCommand("user %s unknown" % self.command)
 

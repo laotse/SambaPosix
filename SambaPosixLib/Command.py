@@ -16,11 +16,10 @@ class Command(object):
     '''
 
 
-    def __init__(self,args,opts,oLDAP):
+    def __init__(self,opts,oLDAP):
         '''
         Constructor
         '''
-        self.args = args[1:]
         self.opts = opts
         self.LDAP = oLDAP
         self.command = None
@@ -33,8 +32,8 @@ class Command(object):
         return parser
 
     @classmethod
-    def run(cls,args,opts,oLDAP):
-        oCls = cls(args,opts,oLDAP)
+    def run(cls,opts,oLDAP):
+        oCls = cls(opts,oLDAP)
         return oCls._do_run()
 
     def _do_run(self):
