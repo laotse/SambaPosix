@@ -6,6 +6,7 @@ Created on 28.10.2014
 
 import ldap, ldap.sasl
 import getpass
+import base64,re,struct
 
 from SambaPosixLib.Logger import Logger
 
@@ -135,3 +136,73 @@ class LDAPQuery(object):
                 first = False
         else:
             self.LDAP.modify_s(dn, modlist)
+
+    @classmethod
+    def decodeSID(cls, val):
+        def decode(v):
+            o = 0L
+            for i in range(len(v)):
+                o <<= 8
+                o |= v[i]
+            return "-%d" % o
+
+        try:
+            bVal = base64.b64decode(val)
+        except TypeError:
+            # this is probably a binary already
+            bVal = val
+
+        if isinstance(bVal, str):
+            bVal = [ord(x) for x in bVal]
+
+        out = "S"
+        out += decode([bVal[0]])
+        groups = bVal[1]
+
+        l = groups + 2
+        l *= 4
+        if l != len(bVal):
+            raise ValueError("SID with %d groups should have length: %d, but %d bytes passed!" % (groups,l,len(bVal)))
+
+        # this is big endian
+        out += decode(bVal[2:8])
+
+        # the rest is little endian
+        for i in range(8,l,4):
+            out += decode(list(reversed(bVal[i:i+4])))
+
+        return out
+
+    @classmethod
+    def encodeSID(cls, s):
+        def encode(v, rev=True, pad=4):
+            out = []
+            v = int(v)
+            while v > 0:
+                out += [v & 0xff]
+                v >>= 8
+            while len(out) < pad:
+                out += [0]
+            if not rev:
+                out.reverse()
+            if len(out) != pad or v != 0:
+                raise ValueError("Error encoding SID - illegal component value")
+            return out
+
+        components = s.split("-")
+        if components[0] != "S":
+            raise ValueError("SID must start with 'S'")
+        if len(components) < 3:
+            raise ValueError("SID must contain at least 3 parts")
+        for p in components[1:]:
+            if not re.match('^[0-9]+$',p):
+                raise ValueError("SID parts must be numerical")
+        groups = len(components)-3
+
+        sid = [int(components[1]),groups]
+        sid += encode(components[2],False,6)
+        for p in components[3:]:
+            sid += encode(p)
+
+        sid = struct.pack('B'* len(sid), *sid)
+        return base64.b64encode(sid)

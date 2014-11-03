@@ -76,6 +76,16 @@ def main(argv = None):
     for module in program_modules:
         module.optionGroup(module_parsers)
 
+    """
+    sid = LDAPQuery.decodeSID('AQUAAAAAAAUVAAAA0kLuMIavzV1ey2pZdAQAAA==')
+    print sid
+    if LDAPQuery.encodeSID(sid) != 'AQUAAAAAAAUVAAAA0kLuMIavzV1ey2pZdAQAAA==':
+        print "Encoding SID failed!"
+    else:
+        print "Encoding loop OK!"
+    sys.exit(0)
+    """
+
     opts = vars(parser.parse_args())
     oConfig.setBase(opts['base'])
     oConfig.setURI(opts['url'])
