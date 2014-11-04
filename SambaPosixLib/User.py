@@ -3,11 +3,11 @@ Created on 28.10.2014
 
 @author: mgr
 '''
-import ldap.dn
+import ldap.dn, base64
 
 from SambaPosixLib.LDAPEntry import LDAPEntry
 from SambaPosixLib.Logger import Logger
-from SambaPosixLib.PosixValidator import PosixValidator as Validator
+from SambaPosixLib.PosixValidator import PosixValidator as Validator, ADValidator
 
 class User(LDAPEntry):
     '''
@@ -36,6 +36,47 @@ class User(LDAPEntry):
             return False
 
         return cls(results[0])
+
+    @classmethod
+    def byUID(cls, uid, oLDAP):
+        log = Logger()
+        if not Validator.checkPosixID(uid):
+            log.error("%s is no valid POSIX user id")
+            return False
+        results = oLDAP.search('(&(objectClass=posixAccount)(objectClass=user)(uidNumber=%s))' % uid, True)
+        if results is None or len(results) < 1:
+            log.debug("No user for uid %s" % uid)
+            return False
+        if len(results) > 1:
+            log.error("POSIX settings corrupt: %d entries for user id %s" % (len(results),uid))
+            return False
+
+        return cls(results[0])
+
+    @classmethod
+    def bySID(cls, sid, oLDAP):
+        log = Logger()
+        rid = ADValidator.normalizeRID(sid)
+        if not rid is False and isinstance(rid, int):
+            # this is a RID
+            sid = oLDAP.getDomainSID(None, rid, True)
+        else:
+            if ADValidator.checkSID(sid):
+                # this is a plain SID
+                sid = oLDAP.encodeSID(sid,True)
+            elif ADValidator.checkBase64(sid):
+                # this could be a base64 encoded SID
+                sid = base64.b64decode(sid)
+            # else: binary SID, do nothing!
+        esid = ldap.filter.escape_filter_chars(sid,2)
+        entries = oLDAP.search('(&(objectClass=user)(objectSid=%s))' % esid)
+        if entries is not None and len(entries) > 1:
+            log.error("AD database corrupt: %d entries for user SID %s" % (len(entries),oLDAP.decodeSID(sid)))
+            return False
+        if entries is None or len(entries) < 1:
+            log.trace("User SID %s not found!" % oLDAP.decodeSID(sid))
+            return False
+        return cls(entries[0])
 
     @classmethod
     def posixUsers(cls,oLDAP):

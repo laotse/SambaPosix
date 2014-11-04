@@ -3,7 +3,6 @@ Created on 29.10.2014
 
 @author: mgr
 '''
-
 from SambaPosixLib.Logger import Logger
 from SambaPosixLib.Command import Command, InvalidCommand
 from SambaPosixLib.User import User
@@ -24,7 +23,9 @@ class ManageUsers(Command):
     @classmethod
     def optionGroup(cls, subparsers):
         modparse = subparsers.add_parser('user', help='user management')
-        #group = OptionGroup(parser,"Options for Posix user accounts")
+        source_id = modparse.add_mutually_exclusive_group()
+        source_id.add_argument('-R','--by-RID',dest='byRID',action='store_true', help="reference users by SID / RID instead by user name")
+        source_id.add_argument('--by-UID',dest='byGID',action='store_true', help="reference users by UID instead by user name")
         modparsers = modparse.add_subparsers(dest="command")
         set_parser = modparsers.add_parser('set', help='set POSIX attributes to user')
         set_parser.add_argument("user", help="user to modify")
@@ -53,10 +54,17 @@ class ManageUsers(Command):
         out += indent + "help - this help page"
         return out
 
+    def _byName(self, name):
+        if self.opts['byGID'] is True:
+            return User.byUID(name, self.LDAP)
+        if self.opts['byRID'] is True:
+            return User.bySID(name, self.LDAP)
+        return User.byAccount(name, self.LDAP)
+
     def do_getent(self):
         if len(self.opts['user']) > 0:
             for name in self.opts['user']:
-                user = User.byAccount(name, self.LDAP)
+                user = self._byName(name)
                 if user is False:
                     log = Logger()
                     log.error("User %s does not exist!" % name)
@@ -70,7 +78,7 @@ class ManageUsers(Command):
     def do_id(self):
         log = Logger()
         for name in self.opts['user']:
-            user = User.byAccount(name, self.LDAP)
+            user = self._byName(name)
             if user is False:
                 log.error("User %s does not exist!" % name)
                 return 1
