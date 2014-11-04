@@ -54,7 +54,7 @@ class ManageUsers(Command):
         return out
 
     def do_getent(self):
-        if len(self.opts['user']) > 1:
+        if len(self.opts['user']) > 0:
             for name in self.opts['user']:
                 user = User.byAccount(name, self.LDAP)
                 if user is False:
@@ -90,6 +90,15 @@ class ManageUsers(Command):
                 else:
                     gname = group.getSingleValue('sAMAccountName')
                     out += " gid=%s(%s)" % (gid,gname)
+
+            grid = group.getRID()
+            urid = user.getSingleValue('primaryGroupID')
+            if not urid is None and int(grid) != int(urid):
+                pgroup = Group.byRID(urid, self.LDAP, user.getSingleValue('objectSid'))
+                if not pgroup is False:
+                    out += "![%s]" % pgroup.getSingleValue('sAMAccountName')
+                else:
+                    out += "![*]"
 
             # TODO: posixGroup !?
             groups = []

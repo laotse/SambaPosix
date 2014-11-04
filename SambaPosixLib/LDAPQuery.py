@@ -219,7 +219,7 @@ class LDAPQuery(object):
                 raise ValueError("Cannot find Administrator account in LDAP")
             sid = sid[1]['objectSid'][0]
         if not isinstance(sid, str) and hasattr(sid, '__contains__'):
-            if 'objectSid' in sid: sid = sid['objectSid']
+            if 'objectSid' in sid: sid = sid['objectSid'][0]
         if sid is not None and not isinstance(sid, str):
             print sid
             raise TypeError("Cannot convert %s to SID" % str(type(sid)))
