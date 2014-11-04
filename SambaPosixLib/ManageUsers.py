@@ -33,8 +33,7 @@ class ManageUsers(Command):
         set_parser.add_argument("user", help="user to modify")
         set_parser.add_argument("-u", "--uid", dest="uid", help="set / use numerical user ID", metavar="UID")
         set_parser.add_argument("--user", dest="user", help="choose user name", metavar="NAME")
-        set_parser.add_argument("-g", "--gid", dest="gid", help="set numerical group ID of login group", metavar="GID")
-        set_parser.add_argument("-G", "--group", dest="group", help="set group name of login group", metavar="NAME")
+        set_parser.add_argument("-g", "--gid", dest="gid", help="set group ID of login group - may be passed as numerical ID or as name of a POSIX group", metavar="GID")
         set_parser.add_argument("--gecos", dest="gecos", help="set gecos", metavar="NAME")
         set_parser.add_argument("--shell", dest="shell", help="set shell", metavar="PATH")
         set_parser.add_argument("--home", dest="home", help="set home directory", metavar="PATH")
@@ -155,11 +154,16 @@ class ManageUsers(Command):
             if not Validator.checkPosixID(self.opts['uid']):
                 raise ValueError("%s is not valid for user id" % self.opts['uid'])
             if not Validator.checkPosixID(self.opts['gid']):
-                raise ValueError("%s is not valid for group id" % self.opts['gid'])
+                if Validator.checkPosixName(self.opts['gid']):
+                    group = Group.byName(self.opts['gid'], self.LDAP)
+                    if not group is None and group.hasAttribute('gidNumber'):
+                        self.opts['gid'] = group.getSingleValue('gidNumber')
+                    else:
+                        raise ValueError("%s is not valid for group id" % self.opts['gid'])
+                else:
+                    raise ValueError("%s is not valid for group id" % self.opts['gid'])
             if not Validator.checkPosixName(self.opts['user']):
                 raise ValueError("%s is not valid for user name" % self.opts['user'])
-            if not Validator.checkPosixName(self.opts['group']):
-                raise ValueError("%s is not valid for group name" % self.opts['group'])
             if not Validator.checkPosixPath(self.opts['shell']):
                 raise ValueError("%s is not valid for shell" % self.opts['shell'])
             if not Validator.checkPosixPath(self.opts['home']):
@@ -196,8 +200,7 @@ class ManageUsers(Command):
         modify += [self.makeModify(user, gid, 'gidNumber')]
         group = Group.byGID(gid, self.LDAP)
         if not group is None:
-            # FIXME: this fails, but piping the -n LDIF to ldapmodify works! Very strange!
-            modify += [self.makeModify(user, group.getRID(), 'primaryGroupID')]
+            modify += [self.makeModify(user, str(group.getRID()), 'primaryGroupID')]
 
         modify += [self.makeModify(user, self.opts['home'], 'unixHomeDirectory')]
         modify += [self.makeModify(user, self.opts['shell'], 'loginShell')]
