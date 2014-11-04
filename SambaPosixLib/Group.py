@@ -45,7 +45,7 @@ class Group(LDAPEntry):
         if not Validator.checkPOSIXID(gid):
             log.error("%s is no valid POSIX GID" % gid)
             return False
-        entries = oLDAP.search('(&(objectClass=posixGroup)(gidNumber=%s))' % gid)
+        entries = oLDAP.search('(&(objectClass=posixGroup)(gidNumber=%s))' % gid, True)
         if len(entries) > 1:
             accounts = []
             for record in entries:
@@ -119,3 +119,9 @@ class Group(LDAPEntry):
             members += " ("+",".join(self.values('memberUid'))+")"
         out += [members]
         return ":".join([x if x is not None else "" for x in out])
+
+    def getRID(self):
+        if not 'objectSid' in self:
+            raise ValueError("Group object has no SID")
+        sid = LDAPQuery.decodeSID(self['objectSid'][0])
+        return int(sid.split('-')[-1])

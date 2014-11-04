@@ -61,7 +61,7 @@ class LDAPQuery(object):
             return False
         self.Anonymous = False
         log = Logger()
-        log.info("Simple bind as %s to %s successful" % (dn, self.URL))
+        log.debug("Simple bind as %s to %s successful" % (dn, self.URL))
         return True
 
     def _krbBind(self):
@@ -78,7 +78,7 @@ class LDAPQuery(object):
             log.error(e)
             return False
         self.Anonymous = False
-        log.info("Kerberos bind to %s successful" % self.URL)
+        log.debug("Kerberos bind to %s successful" % self.URL)
         return True
 
     def connect(self, privileged = False):

@@ -35,7 +35,9 @@ class ManageGroups(Command):
         set_parser.add_argument("-g", "--gid", dest="gid", help="set numerical group ID", metavar="GID")
 
         get_parser = modparsers.add_parser("getent", help="get getent like output for one, more, or all POSIX groups")
-        get_parser.add_argument('-R','--by-RID',dest='byRID',action='store_true', help="reference groups by RID instead by group name")
+        source_id = get_parser.add_mutually_exclusive_group()
+        source_id.add_argument('-R','--by-RID',dest='byRID',action='store_true', help="reference groups by RID instead by group name")
+        source_id.add_argument('-G','--by-GID',dest='byGID',action='store_true', help="reference groups by GID instead by group name")
         get_parser.add_argument("group", nargs='*', help="group to list")
 
         return True
@@ -43,6 +45,8 @@ class ManageGroups(Command):
     def _byName(self, name):
         if self.opts['byRID'] is True:
             return Group.byRID(name, self.LDAP)
+        if  self.opts['byGID'] is True:
+            return Group.byGID(name, self.LDAP)
         return Group.byName(name, self.LDAP)
 
     def do_getent(self):
