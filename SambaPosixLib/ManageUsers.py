@@ -3,6 +3,8 @@ Created on 29.10.2014
 
 @author: mgr
 '''
+import ldap
+
 from SambaPosixLib.Logger import Logger
 from SambaPosixLib.Command import Command, InvalidCommand
 from SambaPosixLib.User import User
@@ -137,6 +139,54 @@ class ManageUsers(Command):
             log.result(out)
         return 0
 
+    def makeModify(self,entry,val,attribute):
+        if val is None:
+            return None
+        cur = entry.getSingleValue(attribute)
+        if cur == val:
+            return None
+        if cur is None:
+            return (ldap.MOD_ADD, attribute, val)
+        return (ldap.MOD_REPLACE, attribute, val)
+
+    def do_set(self):
+        user = self._byName(self.opts['user'])
+        if user is None:
+            self.error("User %s not found in AD" % self.opts['user'])
+            return 1
+
+        name = user.getSingleValue('sAMAccountName')
+        modify = []
+        if not user.hasAttribute('objectClass', 'posixAccount'):
+            modify += [(ldap.MOD_ADD, 'objectClass', 'posixAccount')]
+        modify += [self.makeModify(user, name, 'uid')]
+        if user.hasAttribute('msSFU30Name'):
+            modify += [self.makeModify(user, name, 'msSFU30Name')]
+
+        modify += [self.makeModify(user, self.opts['uid'], 'uidNumber')]
+        # TODO: auto-add user to group, if gid is given?
+
+        gid = self.opts['gid']
+        if gid is None: gid = user.getSingleValue('gidNumber')
+        rid = user.getSingleValue('primaryGroupID')
+        if gid is None:
+            group = Group.byRID(rid, self.LDAP, user)
+            if not group is None:
+                gid = group.getSingleValue('gidNumber')
+        modify += [self.makeModify(user, gid, 'gidNumber')]
+        group = Group.byGID(gid, self.LDAP)
+        if not group is None:
+            # FIXME: this fails, but piping the -n LDIF to ldapmodify works! Very strange!
+            modify += [self.makeModify(user, group.getRID(), 'primaryGroupID')]
+
+        modify += [self.makeModify(user, self.opts['home'], 'unixHomeDirectory')]
+        modify += [self.makeModify(user, self.opts['shell'], 'loginShell')]
+        modify += [self.makeModify(user, self.opts['gecos'], 'gecos')]
+
+        modify = [x for x in modify if not x is None]
+        if len(modify) > 0:
+            self.LDAP.modify(user.dn(), modify)
+
     def do_run(self):
         if self.command == "getent":
             return self.do_getent()
@@ -144,5 +194,7 @@ class ManageUsers(Command):
             return self.do_id()
         if self.command == "sid":
             return self.do_sid()
+        if self.command == "set":
+            return self.do_set()
         raise InvalidCommand("user %s unknown" % self.command)
 
