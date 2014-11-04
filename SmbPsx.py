@@ -77,17 +77,6 @@ def main(argv = None):
     for module in program_modules:
         module.optionGroup(module_parsers)
 
-    """
-    sid = LDAPQuery.decodeSID('AQUAAAAAAAUVAAAA0kLuMIavzV1ey2pZdAQAAA==')
-    print sid
-    if LDAPQuery.encodeSID(sid) != 'AQUAAAAAAAUVAAAA0kLuMIavzV1ey2pZdAQAAA==':
-        print "Encoding SID failed!"
-    else:
-        print "Encoding loop OK!"
-    print "Domain SID: " + LDAPQuery.encodeSID("S-1-5-21-820921042-1573760902-1500171102")
-    sys.exit(0)
-    """
-
     opts = vars(parser.parse_args())
     oConfig.setBase(opts['base'])
     oConfig.setURI(opts['url'])
@@ -101,6 +90,9 @@ def main(argv = None):
         oLDAP = LDAPQuery(oConfig, opts['bind_user'])
     else:
         oLDAP = LDAPQuery(oConfig)
+
+    if opts['dry_run'] is True:
+        oLDAP.setDry()
 
     try:
         for module in program_modules:

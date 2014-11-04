@@ -27,6 +27,9 @@ class LDAPQuery(object):
             self.user = None
         self.Logger = Logger()
 
+        # do not perform modifications
+        self.Dry = False
+
     def _bindAnonymous(self):
         log = Logger()
         try:
@@ -116,8 +119,16 @@ class LDAPQuery(object):
             return None
         return results[0]
 
+    def setDry(self, flag = True):
+        if flag is True:
+            self.Dry = True
+        elif flag is False:
+            self.Dry = False
+        else:
+            raise TypeError("Dry run flag is not boolean!")
+
     def modify(self,dn,modlist):
-        if self.opts.dry_run:
+        if self.Dry:
             self.Logger.ldif("dn: %s" % dn)
             self.Logger.ldif("changetype: modify")
             first = True
@@ -132,7 +143,8 @@ class LDAPQuery(object):
                     self.Logger.ldif("replace: %s" % m[1])
                 else:
                     raise ValueError("Unknown action for changetype modify!")
-                self.Logger.ldif("%s: %s" % (m[1],m[2]))
+                if m[0] != ldap.MOD_DELETE or m[2] is not None:
+                    self.Logger.ldif("%s: %s" % (m[1],m[2]))
                 first = False
         else:
             self.LDAP.modify_s(dn, modlist)
