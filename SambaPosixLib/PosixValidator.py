@@ -22,7 +22,8 @@ class PosixValidator(object):
     def checkPosixName(cls,val):
         if val is None: return True
         # FIXME: should be NAME_REGEX
-        if not re.match('^[_.A-Za-z0-9][-\@_.A-Za-z0-9]*\$?$',val): return False
+        if not re.match('^[_.A-Za-z0-9][-\@_.A-Za-z0-9 ]*\$?$',val): return False
+        if val[-1] == " ": return False
         # FIXME: should be LOGIN_NAME_MAX
         if len(val) > 255: return False
         return True
