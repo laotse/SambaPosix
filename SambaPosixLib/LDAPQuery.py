@@ -146,10 +146,13 @@ class LDAPQuery(object):
                 o |= v[i]
             return "-%d" % o
 
-        try:
-            bVal = base64.b64decode(val)
-        except TypeError:
-            # this is probably a binary already
+        if re.match('^[A-Za-z0-9+/]+={0,2}$',val):
+            try:
+                bVal = base64.b64decode(val)
+            except TypeError:
+                # this is probably a binary already
+                bVal = val
+        else:
             bVal = val
 
         if isinstance(bVal, str):
@@ -162,6 +165,7 @@ class LDAPQuery(object):
         l = groups + 2
         l *= 4
         if l != len(bVal):
+            #print "SID: " + str(bVal)
             raise ValueError("SID with %d groups should have length: %d, but %d bytes passed!" % (groups,l,len(bVal)))
 
         # this is big endian
@@ -174,7 +178,7 @@ class LDAPQuery(object):
         return out
 
     @classmethod
-    def encodeSID(cls, s):
+    def encodeSID(cls, s, raw = False):
         def encode(v, rev=True, pad=4):
             out = []
             v = int(v)
@@ -205,4 +209,29 @@ class LDAPQuery(object):
             sid += encode(p)
 
         sid = struct.pack('B'* len(sid), *sid)
+        if raw: return sid
         return base64.b64encode(sid)
+
+    def getDomainSID(self, sid = None, rid=None, raw = False):
+        if sid is None:
+            sid = self.readDN("CN=Administrator,"+self.Base, True)
+            if sid is None:
+                raise ValueError("Cannot find Administrator account in LDAP")
+            sid = sid[1]['objectSid'][0]
+        if not isinstance(sid, str) and hasattr(sid, '__contains__'):
+            if 'objectSid' in sid: sid = sid['objectSid']
+        if sid is not None and not isinstance(sid, str):
+            print sid
+            raise TypeError("Cannot convert %s to SID" % str(type(sid)))
+        if not re.match('^S(?:-[0-9]{1,10}){3,7}$', sid):
+            # this is a binary representation
+            sid = self.decodeSID(sid)
+        domainSID = "-".join(sid.split('-')[:-1])
+        if not rid is None:
+            if isinstance(rid, (int,long)):
+                rid = "%d" % rid
+            if not re.match("^[0-9]{1,10}$", rid):
+                raise ValueError("RID %s is invalid" % str(rid))
+            domainSID += "-%s" % rid
+        return self.encodeSID(domainSID, raw)
+

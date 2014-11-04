@@ -6,6 +6,7 @@ Created on 30.10.2014
 
 import ldap
 
+from SambaPosixLib.Logger import Logger
 from SambaPosixLib.PosixValidator import PosixValidator as Validator
 
 from SambaPosixLib.Command import Command, InvalidCommand
@@ -34,27 +35,27 @@ class ManageGroups(Command):
         set_parser.add_argument("-g", "--gid", dest="gid", help="set numerical group ID", metavar="GID")
 
         get_parser = modparsers.add_parser("getent", help="get getent like output for one, more, or all POSIX groups")
+        get_parser.add_argument('-R','--by-RID',dest='byRID',action='store_true', help="reference groups by RID instead by group name")
         get_parser.add_argument("group", nargs='*', help="group to list")
 
         return True
 
-    def usage(self, msg):
-        indent = " " * 3
-        out = msg + "\n\n"
-        out += self.Usage + "\n"
-        out += indent + "getent [group] - getent for one or all POSIX groups" + "\n"
-        out += indent + "set [group] [--gid GID] - make existing group a POSIX group and assign GID\n"
-        out += indent + "help - this help page"
-        return out
+    def _byName(self, name):
+        if self.opts['byRID'] is True:
+            return Group.byRID(name, self.LDAP)
+        return Group.byName(name, self.LDAP)
 
     def do_getent(self):
-        if len(self.opts['group']) > 1:
+        log = Logger()
+        log.trace(str(self.opts))
+        if len(self.opts['group']) > 0:
             for name in self.opts['group']:
-                group = Group.byName(name, self.LDAP)
+                log.trace("Trying to locate group: %s" % name)
+                group = self._byName(name)
                 if group is False:
                     self.Logger.error("Group %s does not exist!" % name)
                     return 1
-                print group.formatAsGetent()
+                print group.formatAsGetent(self.LDAP)
             return 0
         for group in Group.posixGroups(self.LDAP):
             print group.formatAsGetent(self.LDAP)
@@ -65,7 +66,7 @@ class ManageGroups(Command):
             self.Logger.error("%s is an invalid group ID" % self.opts['gid'])
             return 5
 
-        group = Group.byName(self.opts['group'], self.LDAP)
+        group = self._byName(self.opts['group'])
         if group is None:
             self.error("Group %s specified for modification does not exist" % self.opts['group'])
             return 1

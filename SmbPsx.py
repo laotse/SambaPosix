@@ -21,6 +21,7 @@ from SambaPosixLib.LDAPConf import LDAPConf
 
 from SambaPosixLib.ManageUsers import ManageUsers
 from SambaPosixLib.ManageGroups import ManageGroups
+from SambaPosixLib.Toolbox import Toolbox
 from SambaPosixLib.Command import InvalidCommand
 
 import sys,os
@@ -44,7 +45,7 @@ def main(argv = None):
     program_license = "Copyright 2014 Dr. Lars Hanke (µAC - Microsystem Accessory Consult)                                            \
                 Licensed under the GNU Public License v3\nhttp://www.gnu.org/licenses/gpl-3.0.html".decode('utf8')
 
-    program_modules = [ManageUsers,ManageGroups]
+    program_modules = [ManageUsers,ManageGroups, Toolbox]
 
     if argv is None:
         argv = sys.argv[1:]
@@ -83,6 +84,7 @@ def main(argv = None):
         print "Encoding SID failed!"
     else:
         print "Encoding loop OK!"
+    print "Domain SID: " + LDAPQuery.encodeSID("S-1-5-21-820921042-1573760902-1500171102")
     sys.exit(0)
     """
 

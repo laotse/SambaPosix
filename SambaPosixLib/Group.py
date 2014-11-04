@@ -3,7 +3,10 @@ Created on 30.10.2014
 
 @author: mgr
 '''
+import ldap.filter
+
 from SambaPosixLib.LDAPEntry import LDAPEntry
+from SambaPosixLib.LDAPQuery import LDAPQuery
 from SambaPosixLib.Logger import Logger
 from SambaPosixLib.PosixValidator import PosixValidator as Validator
 
@@ -51,6 +54,20 @@ class Group(LDAPEntry):
                 else:
                     accounts += record.dn()
             log.error("%s all share gid %s" % (", ".join(accounts), gid))
+            return False
+        return cls(entries[0])
+
+    @classmethod
+    def byRID(cls, rid, oLDAP, sid = None):
+        log = Logger()
+        sid = oLDAP.getDomainSID(sid, rid, True)
+        esid = ldap.filter.escape_filter_chars(sid,2)
+        entries = oLDAP.search('(&(objectClass=group)(objectSid=%s))' % esid)
+        if entries is not None and len(entries) > 1:
+            log.error("AD database corrupt: %d entries for group SID %s" % (len(entries),oLDAP.decodeSID(sid)))
+            return False
+        if entries is None or len(entries) < 1:
+            log.trace("Group SID %s not found!" % oLDAP.decodeSID(sid))
             return False
         return cls(entries[0])
 
