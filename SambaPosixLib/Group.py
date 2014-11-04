@@ -42,7 +42,7 @@ class Group(LDAPEntry):
     @classmethod
     def byGID(cls, gid, oLDAP):
         log = Logger()
-        if not Validator.checkPOSIXID(gid):
+        if not Validator.checkPosixID(gid):
             log.error("%s is no valid POSIX GID" % gid)
             return False
         entries = oLDAP.search('(&(objectClass=posixGroup)(gidNumber=%s))' % gid, True)
