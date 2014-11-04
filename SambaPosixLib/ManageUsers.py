@@ -150,6 +150,26 @@ class ManageUsers(Command):
         return (ldap.MOD_REPLACE, attribute, val)
 
     def do_set(self):
+        # sanitize options
+        try:
+            if not Validator.checkPosixID(self.opts['uid']):
+                raise ValueError("%s is not valid for user id" % self.opts['uid'])
+            if not Validator.checkPosixID(self.opts['gid']):
+                raise ValueError("%s is not valid for group id" % self.opts['gid'])
+            if not Validator.checkPosixName(self.opts['user']):
+                raise ValueError("%s is not valid for user name" % self.opts['user'])
+            if not Validator.checkPosixName(self.opts['group']):
+                raise ValueError("%s is not valid for group name" % self.opts['group'])
+            if not Validator.checkPosixPath(self.opts['shell']):
+                raise ValueError("%s is not valid for shell" % self.opts['shell'])
+            if not Validator.checkPosixPath(self.opts['home']):
+                raise ValueError("%s is not valid for home" % self.opts['home'])
+            if not Validator.checkGecos(self.opts['gecos']):
+                raise ValueError("%s is not valid for gecos" % self.opts['gecos'])
+        except ValueError, e:
+            self.Logger.error(str(e))
+            return 5
+
         user = self._byName(self.opts['user'])
         if user is None:
             self.error("User %s not found in AD" % self.opts['user'])
