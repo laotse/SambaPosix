@@ -42,7 +42,9 @@ class ManageUsers(Command):
 
         get_parser = modparsers.add_parser("getent", help="get getent like output for one, more, or all POSIX users")
         get_parser.add_argument("user", nargs='*', help="user to list")
-        #parser.add_option_group(group)
+
+        sid_parser = modparsers.add_parser("sid", help="get SID of users")
+        sid_parser.add_argument("user", nargs='*', help="user to retrieve SID")
         return True
 
     def usage(self, msg):
@@ -73,6 +75,20 @@ class ManageUsers(Command):
             return 0
         for user in User.posixUsers(self.LDAP):
             print user.formatAsGetent()
+        return 0
+
+    def do_sid(self):
+        if len(self.opts['user']) > 0:
+            for name in self.opts['user']:
+                user = self._byName(name)
+                if user is False:
+                    log = Logger()
+                    log.error("User %s does not exist!" % name)
+                    return 1
+                print user.formatAsSID()
+            return 0
+        for user in User.posixUsers(self.LDAP):
+            print user.formatAsSID()
         return 0
 
     def do_id(self):
@@ -126,5 +142,7 @@ class ManageUsers(Command):
             return self.do_getent()
         if self.command == "id":
             return self.do_id()
+        if self.command == "sid":
+            return self.do_sid()
         raise InvalidCommand("user %s unknown" % self.command)
 

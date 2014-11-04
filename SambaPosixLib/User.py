@@ -5,6 +5,7 @@ Created on 28.10.2014
 '''
 import ldap.dn, base64
 
+from SambaPosixLib.LDAPQuery import LDAPQuery
 from SambaPosixLib.LDAPEntry import LDAPEntry
 from SambaPosixLib.Logger import Logger
 from SambaPosixLib.PosixValidator import PosixValidator as Validator, ADValidator
@@ -111,3 +112,22 @@ class User(LDAPEntry):
         out += [self.getSingleValue('loginShell')]
 
         return ":".join([x if x is not None else "" for x in out])
+
+    def getSID(self):
+        sid = self.getSingleValue('objectSid')
+        return LDAPQuery.decodeSID(sid)
+
+    def formatAsSID(self):
+        values = []
+        values += [self.getSingleValue('uid')]
+        values += [self.getSingleValue('sAMAccountName')]
+        values += [self.getSingleValue('uidNumber')]
+        values += [self.getSID()]
+        values = [x if isinstance(x, str) else "*" for x in values]
+        out = values[1]
+        if values[0] != values[1]:
+            out += " [!%s]" % values[0]
+        out += ":%s:" % values[2]
+        out += values[3]
+        return out
+
