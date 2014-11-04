@@ -29,15 +29,15 @@ class ManageGroups(Command):
     @classmethod
     def optionGroup(cls, subparsers):
         modparse = subparsers.add_parser('group', help='group management')
+        source_id = modparse.add_mutually_exclusive_group()
+        source_id.add_argument('-R','--by-RID',dest='byRID',action='store_true', help="reference groups by RID instead by group name")
+        source_id.add_argument('-G','--by-GID',dest='byGID',action='store_true', help="reference groups by GID instead by group name")
         modparsers = modparse.add_subparsers(dest="command")
         set_parser = modparsers.add_parser('set', help='set POSIX attributes to group')
         set_parser.add_argument("group", help="group to modify")
         set_parser.add_argument("-g", "--gid", dest="gid", help="set numerical group ID", metavar="GID")
 
         get_parser = modparsers.add_parser("getent", help="get getent like output for one, more, or all POSIX groups")
-        source_id = get_parser.add_mutually_exclusive_group()
-        source_id.add_argument('-R','--by-RID',dest='byRID',action='store_true', help="reference groups by RID instead by group name")
-        source_id.add_argument('-G','--by-GID',dest='byGID',action='store_true', help="reference groups by GID instead by group name")
         get_parser.add_argument("group", nargs='*', help="group to list")
 
         return True
