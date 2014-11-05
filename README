@@ -1,0 +1,69 @@
+SambaPosix is a tool to manage POSIX attributes for
+users and groups in a Samba4 based AD DC.
+
+ATTENTION: The state of development is not even alpha.
+At the current stage it helped setting up my own DC.
+Documentation is restricted to what argparse produces.
+I hope to improve this in future.
+
+Please send bugs and ideas to debian@lhanke.de
+
+1) What it can do
+-----------------
+
+SambaPosix can set POSIX attributes to users and groups,
+as well as removing them again.
+
+It can also list, which attributes are set and whether
+conflicting settings exist. This comes in very handy
+while setting up winbind, libnss-ldap, nslcd, etc. What
+SambaPosix tells you, is actually in the LDAP!
+
+SambaPosix can convert base64 encoded SID as returned
+e.g. by ldapsearch to human readable form and vice
+versa.
+
+It can address groups by SID / RID and show SID
+given POSIX names or numbers.
+
+The tool can also add or remove users from groups.
+
+It can bind to the AD DC using Kerberos, or TLS
+protected using name and password. TLS can be disabled.
+
+2) What it cannot do
+--------------------
+
+SambaPosix can not create users or groups, nor
+delete those. Use samba-tool for that purpose.
+
+SambaPosix may use, but does not work on Kerberos. So
+use passwd or samba-tool to work on passwords.
+
+3) Examples
+-----------
+
+# POSIXify user test
+./SambaPosix.py user set test -u 1000 --gecos "Test User" --home "/home/test" --shell "/bin/bash"
+
+# POSIXify group toast
+./SambaPosix.py group set toast -g 1000
+
+# add user test to group toast
+./SambaPosix.py group add toast test
+
+# show id information about user test
+./SambaPosix.py user id test
+
+# show getent information about group toast
+./SambaPosix.py group getent toast
+
+# show complete getent passwd from LDAP
+./SambaPosix.py user getent
+
+# don't use Kerberos, but authenticate as Administrator
+./SambaPosix.py -U Administrator group getent
+
+# unposixify group toast as Administrator
+./SambaPosix.py -U Administrator group set toast --unposix
+
