@@ -11,6 +11,7 @@ from SambaPosixLib.PosixValidator import PosixValidator as Validator
 
 from SambaPosixLib.Command import Command, InvalidCommand
 from SambaPosixLib.Group import Group
+from SambaPosixLib.User import User
 
 class ManageGroups(Command):
     '''
@@ -40,6 +41,14 @@ class ManageGroups(Command):
 
         get_parser = modparsers.add_parser("getent", help="get getent like output for one, more, or all POSIX groups")
         get_parser.add_argument("group", nargs='*', help="group to list")
+
+        add_parser = modparsers.add_parser("add", help="add users to group")
+        add_parser.add_argument("group", help="group to add users to")
+        add_parser.add_argument("users", nargs="+", help="users to add")
+
+        rem_parser = modparsers.add_parser("rem", help="remove users from group")
+        rem_parser.add_argument("group", help="group to remove users from")
+        rem_parser.add_argument("users", nargs="+", help="users to remove")
 
         return True
 
@@ -100,10 +109,62 @@ class ManageGroups(Command):
 
         return 0
 
+    def do_add(self):
+        group = self._byName(self.opts['group'])
+        if group is False:
+            self.Logger.error("Group %s specified for adding users does not exist" % self.opts['group'])
+            return 1
+
+        modify = []
+        for user in self.opts['users']:
+            if not Validator.checkPosixName(user):
+                self.error("User name %s invalid -- skipped" % user)
+                continue
+            oUser = User.byAccount(user, self.LDAP)
+            if oUser is None:
+                self.error("Unknown user %s -- skipped" % user)
+            else:
+                if not group.hasAttribute('member', oUser.dn()):
+                    modify += [(ldap.MOD_ADD, 'member', oUser.dn())]
+
+                if not oUser.hasAttribute('memberOf', group.dn()):
+                    self.LDAP.modify(oUser.dn(), [(ldap.MOD_ADD, 'memberOf', group.dn())])
+
+        if len(modify) > 0:
+            self.LDAP.modify(group.dn(), modify)
+
+    def do_remove(self):
+        group = self._byName(self.opts['group'])
+        if group is False:
+            self.Logger.error("Group %s specified for adding users does not exist" % self.opts['group'])
+            return 1
+
+        modify = []
+        for user in self.opts['users']:
+            if not Validator.checkPosixName(user):
+                self.error("User name %s invalid -- skipped" % user)
+                continue
+            oUser = User.byAccount(user, self.LDAP)
+            if oUser is None:
+                self.error("Unknown user %s -- skipped" % user)
+            else:
+                if group.hasAttribute('member', oUser.dn()):
+                    modify += [(ldap.MOD_DELETE, 'member', oUser.dn())]
+
+                if oUser.hasAttribute('memberOf', group.dn()):
+                    self.LDAP.modify(oUser.dn(), [(ldap.MOD_DELETE, 'memberOf', group.dn())])
+
+        if len(modify) > 0:
+            self.LDAP.modify(group.dn(), modify)
+
     def do_run(self):
         if self.command == "getent":
             return self.do_getent()
         if self.command == "set":
             return self.do_set()
+        if self.command == "add":
+            return self.do_add()
+        if self.command == "rem":
+            return self.do_remove()
 
         raise InvalidCommand("group %s unknown" % self.command)
