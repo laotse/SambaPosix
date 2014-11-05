@@ -28,9 +28,9 @@ import sys,os
 import argparse
 
 __all__ = []
-__version__ = 0.1
+__version__ = 0.2
 __date__ = '2014-09-11'
-__updated__ = '2014-10-28'
+__updated__ = '2014-11-05'
 
 def main(argv = None):
     '''Command line options.'''
