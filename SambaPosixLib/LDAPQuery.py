@@ -131,10 +131,7 @@ class LDAPQuery(object):
         if self.Dry:
             self.Logger.ldif("dn: %s" % dn)
             self.Logger.ldif("changetype: modify")
-            first = True
             for m in modlist:
-                if not first:
-                    self.Logger.ldif('-')
                 if m[0] == ldap.MOD_ADD:
                     self.Logger.ldif("add: %s" % m[1])
                 elif m[0] == ldap.MOD_DELETE:
@@ -145,7 +142,7 @@ class LDAPQuery(object):
                     raise ValueError("Unknown action for changetype modify!")
                 if m[0] != ldap.MOD_DELETE or m[2] is not None:
                     self.Logger.ldif("%s: %s" % (m[1],m[2]))
-                first = False
+                self.Logger.ldif('-')
         else:
             self.LDAP.modify_s(dn, modlist)
 
