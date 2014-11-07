@@ -40,6 +40,7 @@ class Command(object):
         try:
             return self.do_run()
         except InvalidCommand, e:
+            # FIXME: get usage from argparse somehow
             raise InvalidCommand(self.usage(str(e)))
 
     def do_run(self):

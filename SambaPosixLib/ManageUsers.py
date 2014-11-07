@@ -48,15 +48,6 @@ class ManageUsers(Command):
         sid_parser.add_argument("user", nargs='*', help="user to retrieve SID")
         return True
 
-    def usage(self, msg):
-        indent = " " * 3
-        out = msg + "\n\n"
-        out += self.Usage + "\n"
-        out += indent + "getent [user] - getent for one or all POSIX users" + "\n"
-        out += indent + "id user [...] - get id like entries for one or more users"
-        out += indent + "help - this help page"
-        return out
-
     def _byName(self, name):
         if self.opts['byGID'] is True:
             return User.byUID(name, self.LDAP)
