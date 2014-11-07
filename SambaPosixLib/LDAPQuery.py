@@ -10,6 +10,26 @@ import base64,re,struct
 
 from SambaPosixLib.Logger import Logger
 
+class SchemaOptions(object):
+    def __init__(self):
+        # initialize to hybrid
+        self.do_msRFU = True
+        self.do_objectClasses = True
+
+    def msRFU(self, flag = None):
+        if flag is True:
+            self.do_msRFU = True
+        elif flag is False:
+            self.do_msRFU = False
+        return self.do_msRFU
+
+    def objectClass(self, flag = None):
+        if flag is True:
+            self.do_objectClasses = True
+        elif flag is False:
+            self.do_objectClasses = False
+        return self.do_objectClasses
+
 class LDAPQuery(object):
     def __init__(self, oConf, user = None):
         self.noTLS = oConf.noTLS
@@ -29,6 +49,13 @@ class LDAPQuery(object):
 
         # do not perform modifications
         self.Dry = False
+
+        # LDAP fields to control
+        self.Schema = SchemaOptions()
+
+        # some domain value caches
+        self.domainSID = None
+        self.nisDomain = None
 
     def _bindAnonymous(self):
         log = Logger()
@@ -222,20 +249,24 @@ class LDAPQuery(object):
         return base64.b64encode(sid)
 
     def getDomainSID(self, sid = None, rid=None, raw = False):
-        if sid is None:
-            sid = self.readDN("CN=Administrator,"+self.Base, True)
+        if self.domainSID is None:
+            # FIXME: domainSID is the objectSid of self.Base
             if sid is None:
-                raise ValueError("Cannot find Administrator account in LDAP")
-            sid = sid[1]['objectSid'][0]
-        if not isinstance(sid, str) and hasattr(sid, '__contains__'):
-            if 'objectSid' in sid: sid = sid['objectSid'][0]
-        if sid is not None and not isinstance(sid, str):
-            print sid
-            raise TypeError("Cannot convert %s to SID" % str(type(sid)))
-        if not re.match('^S(?:-[0-9]{1,10}){3,7}$', sid):
-            # this is a binary representation
-            sid = self.decodeSID(sid)
-        domainSID = "-".join(sid.split('-')[:-1])
+                sid = self.readDN("CN=Administrator,"+self.Base, True)
+                if sid is None:
+                    raise ValueError("Cannot find Administrator account in LDAP")
+                sid = sid[1]['objectSid'][0]
+            if not isinstance(sid, str) and hasattr(sid, '__contains__'):
+                if 'objectSid' in sid: sid = sid['objectSid'][0]
+            if sid is not None and not isinstance(sid, str):
+                print sid
+                raise TypeError("Cannot convert %s to SID" % str(type(sid)))
+            if not re.match('^S(?:-[0-9]{1,10}){3,7}$', sid):
+                # this is a binary representation
+                sid = self.decodeSID(sid)
+            self.domainSID = "-".join(sid.split('-')[:-1])
+
+        domainSID = self.domainSID
         if not rid is None:
             if isinstance(rid, (int,long)):
                 rid = "%d" % rid
@@ -244,3 +275,14 @@ class LDAPQuery(object):
             domainSID += "-%s" % rid
         return self.encodeSID(domainSID, raw)
 
+    def schema(self, schema = None):
+        if schema is not None:
+            # TODO: check type
+            self.Schema = schema
+        return self.Schema
+
+    def nis(self, domain = None):
+        # FIXME: should rather perform NETLOGON
+        if domain is not None:
+            self.nisDomain = domain.lower()
+        return self.nisDomain

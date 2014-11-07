@@ -45,7 +45,10 @@ class Group(LDAPEntry):
         if not Validator.checkPosixID(gid):
             log.error("%s is no valid POSIX GID" % gid)
             return False
-        entries = oLDAP.search('(&(objectClass=posixGroup)(gidNumber=%s))' % gid, True)
+        if oLDAP.schema().objectClass():
+            entries = oLDAP.search('(&(objectClass=posixGroup)(gidNumber=%s))' % gid, True)
+        else:
+            entries = oLDAP.search('(&(objectClass=group)(gidNumber=%s))' % gid, True)
         if len(entries) > 1:
             accounts = []
             for record in entries:
@@ -80,7 +83,11 @@ class Group(LDAPEntry):
     @classmethod
     def posixGroups(cls, oLDAP):
         log = Logger()
-        entries = oLDAP.search('(objectClass=posixGroup)', True)
+        if oLDAP.schema().objectClass():
+            entries = oLDAP.search('(&(objectClass=posixGroup)(objectClass=group))', True)
+        else:
+            entries = oLDAP.search('(&(objectClass=group)(gidNumber=*))', True)
+
         if entries is None:
             log.trace("No valid POSIX groups found!")
             raise StopIteration
@@ -96,7 +103,7 @@ class Group(LDAPEntry):
             else:
                 member = LDAPEntry(member)
                 if member.hasAttribute('objectClass','user'):
-                    if member.hasAttribute('objectClass','posixAccount'):
+                    if not oLDAP.schema().objectClass() or member.hasAttribute('objectClass','posixAccount'):
                         t = member.getSingleValue('uid')
                         if t is None:
                             t = member.getSingleValue('sAMAccountName')

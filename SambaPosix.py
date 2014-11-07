@@ -16,7 +16,7 @@ Toolsuite to manage POSIX users in an AD
 '''
 from SambaPosixLib.Logger import Logger
 
-from SambaPosixLib.LDAPQuery import LDAPQuery
+from SambaPosixLib.LDAPQuery import LDAPQuery, SchemaOptions
 from SambaPosixLib.LDAPConf import LDAPConf
 
 from SambaPosixLib.ManageUsers import ManageUsers
@@ -24,8 +24,9 @@ from SambaPosixLib.ManageGroups import ManageGroups
 from SambaPosixLib.Toolbox import Toolbox
 from SambaPosixLib.Command import InvalidCommand
 
-import sys,os
+import sys,os,re,socket
 import argparse
+from urlparse import urlparse
 
 __all__ = []
 __version__ = 0.2
@@ -59,7 +60,13 @@ def main(argv = None):
         oConfig.parseConf('/etc/ldap/ldap.conf')
         oConfig.extendBase("CN=Users,")
 
-    parser.set_defaults(base=oConfig.Base, url=oConfig.URI, dry_run=False, verbose=0, bind_user=None)
+    # FIXME: should be a NETLOGON, but nothing seems to support CLDAP
+    # however https://github.com/geertj/python-ad/blob/master/lib/ad/protocol/netlogon.py might help
+    parsed_url = urlparse(oConfig.URI, 'ldap')
+    fqdn = socket.getfqdn(re.sub(':\d+$','',parsed_url[1]))
+    domain = fqdn.split('.')[1]
+
+    parser.set_defaults(base=oConfig.Base, url=oConfig.URI, dry_run=False, verbose=0, bind_user=None, workgroup=domain.upper())
 
     parser.add_argument("-V", "--version", action='version', version=program_version_string)
     group = parser.add_argument_group("General options")
@@ -70,7 +77,11 @@ def main(argv = None):
     group.add_argument("-b", "--base", dest="base", help="Base DN [default: %(default)s]", metavar="DN")
     group.add_argument("-U", "--bind-user", dest="bind_user", help="User for simple bind", metavar="CN | uid")
     group.add_argument("--no-tls", dest="noTLS", action="store_true", help="Don't use TLS for simple bind")
-
+    group.add_argument("-W", "--workgroup", dest="workgroup", help="NETBIOS name of AD [default: %(default)s]", metavar="WORKGROUP")
+    schema = parser.add_mutually_exclusive_group()
+    schema.add_argument("--rfc2307", dest="schema_ldap", action="store_true", help="use LDAP schema compliant POSIX entries")
+    schema.add_argument("--ADUC", dest="schema_aduc", action="store_true", help="simulate entries created by ADUC")
+    schema.add_argument("--hybrid", dest="schema_hybrid", action="store_true", help="use ADUC fields and POSIX object classes")
     #parser.add_option_group(group)
     module_parsers = parser.add_subparsers(help='sub-command help', dest="module")
 
@@ -91,8 +102,27 @@ def main(argv = None):
     else:
         oLDAP = LDAPQuery(oConfig)
 
+    oLDAP.nis(opts['workgroup'])
+
     if opts['dry_run'] is True:
         oLDAP.setDry()
+
+    if opts['schema_ldap']:
+        schema = SchemaOptions()
+        schema.msRFU(False)
+        schema.objectClass(True)
+        oLDAP.schema(schema)
+    elif opts['schema_aduc']:
+        schema = SchemaOptions()
+        schema.msRFU(True)
+        schema.objectClass(False)
+        oLDAP.schema(schema)
+    else:
+        # schema_hybrid and default
+        schema = SchemaOptions()
+        schema.msRFU(True)
+        schema.objectClass(True)
+        oLDAP.schema(schema)
 
     try:
         for module in program_modules:

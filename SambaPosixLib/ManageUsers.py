@@ -138,7 +138,12 @@ class ManageUsers(Command):
             log.result(out)
         return 0
 
-    def makeModify(self,entry,val,attribute):
+    def makeModify(self,entry,val,attribute, support = True):
+        if not support:
+            if not entry.hasAttribute(attribute):
+                return None
+            # delete all occurences, if it is unsupported
+            return (ldap.MOD_DELETE, attribute, None)
         if val is None:
             return None
         cur = entry.getSingleValue(attribute)
@@ -181,11 +186,13 @@ class ManageUsers(Command):
 
         name = user.getSingleValue('sAMAccountName')
         modify = []
-        if not user.hasAttribute('objectClass', 'posixAccount'):
+        if not user.hasAttribute('objectClass', 'posixAccount') and self.LDAP.schema().objectClass():
             modify += [(ldap.MOD_ADD, 'objectClass', 'posixAccount')]
+        elif user.hasAttribute('objectClass', 'posixAccount') and not self.LDAP.schema().objectClass():
+            modify += [(ldap.MOD_DELETE, 'objectClass', 'posixAccount')]
         modify += [self.makeModify(user, name, 'uid')]
-        if user.hasAttribute('msSFU30Name'):
-            modify += [self.makeModify(user, name, 'msSFU30Name')]
+        modify += [self.makeModify(user, name, 'msSFU30Name', self.LDAP.schema().msRFU())]
+        modify += [self.makeModify(user, self.LDAP.nis(), 'msSFU30NisDomain', self.LDAP.schema().msRFU())]
 
         modify += [self.makeModify(user, self.opts['uid'], 'uidNumber')]
         # TODO: auto-add user to group, if gid is given?
@@ -205,6 +212,8 @@ class ManageUsers(Command):
         modify += [self.makeModify(user, self.opts['home'], 'unixHomeDirectory')]
         modify += [self.makeModify(user, self.opts['shell'], 'loginShell')]
         modify += [self.makeModify(user, self.opts['gecos'], 'gecos')]
+
+        modify += [self.makeModify(user, 'ABCD!efgh12345$67890', 'unixUserPassword', self.LDAP.schema().msRFU())]
 
         modify = [x for x in modify if not x is None]
         if len(modify) > 0:

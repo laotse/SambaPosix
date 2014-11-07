@@ -44,7 +44,10 @@ class User(LDAPEntry):
         if not Validator.checkPosixID(uid):
             log.error("%s is no valid POSIX user id")
             return False
-        results = oLDAP.search('(&(objectClass=posixAccount)(objectClass=user)(uidNumber=%s))' % uid, True)
+        if oLDAP.schema().objectClass():
+            results = oLDAP.search('(&(objectClass=posixAccount)(objectClass=user)(uidNumber=%s))' % uid, True)
+        else:
+            results = oLDAP.search('(&(objectClass=user)(uidNumber=%s))' % uid, True)
         if results is None or len(results) < 1:
             log.debug("No user for uid %s" % uid)
             return False
@@ -81,7 +84,11 @@ class User(LDAPEntry):
 
     @classmethod
     def posixUsers(cls,oLDAP):
-        results = oLDAP.search('(objectClass=posixAccount)', True)
+        if oLDAP.schema().objectClass():
+            results = oLDAP.search('(&(objectClass=posixAccount)(objectClass=user))', True)
+        else:
+            results = oLDAP.search('(&(objectClass=user)(uidNumber=*))', True)
+
         for result in results:
             yield cls(result)
 
