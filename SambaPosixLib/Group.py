@@ -9,6 +9,7 @@ from SambaPosixLib.LDAPEntry import LDAPEntry
 from SambaPosixLib.LDAPQuery import LDAPQuery
 from SambaPosixLib.Logger import Logger
 from SambaPosixLib.PosixValidator import PosixValidator as Validator
+from __builtin__ import classmethod
 
 class Group(LDAPEntry):
     '''
@@ -90,6 +91,16 @@ class Group(LDAPEntry):
 
         if entries is None:
             log.trace("No valid POSIX groups found!")
+            raise StopIteration
+        for group in entries:
+            yield cls(group)
+
+    @classmethod
+    def filterGroups(cls, oLDAP, filt = '(&(objectClass=group)(gidNumber=*))'):
+        log = Logger()
+        entries = oLDAP.search(filt, True)
+        if entries is None:
+            log.trace("No groups matching filter!")
             raise StopIteration
         for group in entries:
             yield cls(group)

@@ -53,6 +53,10 @@ class ManageGroups(Command):
         unposix_parser.add_argument("--unposix-all-groups", action="store_true", dest="all", help="confirm complete removal of POSIX settings from all groups - only if no groups are specified!")
         unposix_parser.add_argument("group", nargs='*', help="groups to remove POSIX attributes from")
 
+        fix_parser = modparsers.add_parser("fix", help="make POSIX attributes consistent and adhere to chosen profile")
+        fix_parser.add_argument("--fix-all-groups", action="store_true", dest="all", help="confirm fixing all groups with POSIX touch - only if no groups are specified!")
+        fix_parser.add_argument("group", nargs='*', help="groups to fix POSIX attributes")
+
         return True
 
     def _byName(self, name):
@@ -103,6 +107,41 @@ class ManageGroups(Command):
                     log.error("Group %s does not exist!" % name)
                     return 1
                 self._unposix(group)
+        return 0
+
+    def _fix(self, group):
+        modify = []
+        try:
+            gid = group.getSingleValue('gidNumber')
+        except IndexError:
+            gid = None
+        if gid is None:
+            self._unposix(group)
+            return
+
+        if group.hasAttribute('objectClass', 'posixGroup') and not self.LDAP.schema().objectClass():
+            modify += [(ldap.MOD_DELETE, 'objectClass', 'posixGroup')]
+        elif not group.hasAttribute('objectClass', 'posixGroup') and self.LDAP.schema().objectClass():
+            modify += [(ldap.MOD_ADD, 'objectClass', 'posixGroup')]
+
+        if len(modify) > 0:
+            self.LDAP.modify(group.dn(), modify)
+
+    def do_fix(self):
+        if len(self.opts['group']) == 0:
+            if not self.opts['all'] is True:
+                self.Logger.error("You must either specify a list of groups to fix POSIX, or supply --fix-all-groups")
+                return 5
+            for group in Group.filterGroups(self.LDAP, '(&(objectClass=group)(|(gidNumber=*)(objectClass=posixGroup)))'):
+                self._fix(group)
+        else:
+            for name in self.opts['group']:
+                group = self._byName(name)
+                if group is False:
+                    log = Logger()
+                    log.error("Group %s does not exist!" % name)
+                    return 1
+                self._fix(group)
         return 0
 
     def do_set(self):
@@ -183,6 +222,8 @@ class ManageGroups(Command):
         if len(modify) > 0:
             self.LDAP.modify(group.dn(), modify)
 
+
+
     def do_run(self):
         if self.command == "getent":
             return self.do_getent()
@@ -194,5 +235,7 @@ class ManageGroups(Command):
             return self.do_remove()
         if self.command == "unposix":
             return self.do_unposix()
+        if self.command == "fix":
+            return self.do_fix()
 
         raise InvalidCommand("group %s unknown" % self.command)
