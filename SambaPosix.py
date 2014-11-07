@@ -66,7 +66,13 @@ def main(argv = None):
     fqdn = socket.getfqdn(re.sub(':\d+$','',parsed_url[1]))
     domain = fqdn.split('.')[1]
 
-    parser.set_defaults(base=oConfig.Base, url=oConfig.URI, dry_run=False, verbose=0, bind_user=None, workgroup=domain.upper())
+    parser.set_defaults(base=oConfig.Base,
+                        url=oConfig.URI,
+                        dry_run=False,
+                        verbose=0,
+                        bind_user=None,
+                        workgroup=domain.upper(),
+                        schema=os.getenv('SAMBA_POSIX_SCHEME',"hybrid"))
 
     parser.add_argument("-V", "--version", action='version', version=program_version_string)
     group = parser.add_argument_group("General options")
@@ -79,9 +85,9 @@ def main(argv = None):
     group.add_argument("--no-tls", dest="noTLS", action="store_true", help="Don't use TLS for simple bind")
     group.add_argument("-W", "--workgroup", dest="workgroup", help="NETBIOS name of AD [default: %(default)s]", metavar="WORKGROUP")
     schema = parser.add_mutually_exclusive_group()
-    schema.add_argument("--rfc2307", dest="schema_ldap", action="store_true", help="use LDAP schema compliant POSIX entries")
-    schema.add_argument("--ADUC", dest="schema_aduc", action="store_true", help="simulate entries created by ADUC")
-    schema.add_argument("--hybrid", dest="schema_hybrid", action="store_true", help="use ADUC fields and POSIX object classes")
+    schema.add_argument("--rfc2307", dest="schema", action="store_const", const="ldap", help="use LDAP schema compliant POSIX entries")
+    schema.add_argument("--ADUC", dest="schema", action="store_const", const="aduc", help="simulate entries created by ADUC")
+    schema.add_argument("--hybrid", dest="schema", action="store_const", const="hybrid", help="use ADUC fields and POSIX object classes")
     #parser.add_option_group(group)
     module_parsers = parser.add_subparsers(help='sub-command help', dest="module")
 
@@ -107,22 +113,20 @@ def main(argv = None):
     if opts['dry_run'] is True:
         oLDAP.setDry()
 
-    if opts['schema_ldap']:
-        schema = SchemaOptions()
+    schema = SchemaOptions()
+    if opts['schema'] == 'ldap':
         schema.msRFU(False)
         schema.objectClass(True)
-        oLDAP.schema(schema)
-    elif opts['schema_aduc']:
-        schema = SchemaOptions()
+    elif opts['schema'] == 'aduc':
         schema.msRFU(True)
         schema.objectClass(False)
-        oLDAP.schema(schema)
-    else:
-        # schema_hybrid and default
-        schema = SchemaOptions()
+    elif opts['schema'] == 'hybrid':
         schema.msRFU(True)
         schema.objectClass(True)
-        oLDAP.schema(schema)
+    else:
+        log.error("Unknown database schema: %s" % opts['schema'])
+        return 5
+    oLDAP.schema(schema)
 
     try:
         for module in program_modules:
