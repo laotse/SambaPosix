@@ -46,6 +46,11 @@ class ManageUsers(Command):
 
         sid_parser = modparsers.add_parser("sid", help="get SID of users")
         sid_parser.add_argument("user", nargs='*', help="user to retrieve SID")
+
+        unposix_parser = modparsers.add_parser("unposix", help="remove POSIX attributes from users")
+        unposix_parser.add_argument("--unposix-all-users", action="store_true", dest="all", help="confirm complete removal of POSIX settings from all users - only if no users are specified!")
+        unposix_parser.add_argument("user", nargs='*', help="users to remove POSIX attributes from")
+
         return True
 
     def _byName(self, name):
@@ -54,6 +59,41 @@ class ManageUsers(Command):
         if self.opts['byRID'] is True:
             return User.bySID(name, self.LDAP)
         return User.byAccount(name, self.LDAP)
+
+    def _unposix(self, user):
+        modify = []
+        modify += [self.makeModify(user, None, 'uid', False)]
+        modify += [self.makeModify(user, None, 'uidNumber', False)]
+        modify += [self.makeModify(user, None, 'gidNumber', False)]
+        modify += [self.makeModify(user, None, 'loginShell', False)]
+        modify += [self.makeModify(user, None, 'gecos', False)]
+        modify += [self.makeModify(user, None, 'unixHomeDirectory', False)]
+        modify += [self.makeModify(user, None, 'unixUserPassword', False)]
+        modify += [self.makeModify(user, None, 'msSFU30Name', False)]
+        modify += [self.makeModify(user, None, 'msSFU30NisDomain', False)]
+        if user.hasAttribute('objectClass','posixAccount'):
+            modify += [(ldap.MOD_DELETE, 'objectClass', 'posixAccount')]
+
+        if len(modify) > 0:
+            self.LDAP.modify(user.dn(), modify)
+
+
+    def do_unposix(self):
+        if len(self.opts['user']) == 0:
+            if not self.opts['all'] is True:
+                self.Logger.error("You must either specify a list of users to remove POSIX from, or supply --unposix-all-users")
+                return 5
+            for user in User.posixUsers(self.LDAP):
+                self._unposix(user)
+        else:
+            for name in self.opts['user']:
+                user = self._byName(name)
+                if user is False:
+                    log = Logger()
+                    log.error("User %s does not exist!" % name)
+                    return 1
+                self._unposix(user)
+        return 0
 
     def do_getent(self):
         if len(self.opts['user']) > 0:
@@ -219,5 +259,7 @@ class ManageUsers(Command):
             return self.do_sid()
         if self.command == "set":
             return self.do_set()
+        if self.command == "unposix":
+            return self.do_unposix()
         raise InvalidCommand("user %s unknown" % self.command)
 

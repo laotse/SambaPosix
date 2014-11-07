@@ -37,7 +37,6 @@ class ManageGroups(Command):
         set_parser = modparsers.add_parser('set', help='set POSIX attributes to group')
         set_parser.add_argument("group", help="group to modify")
         set_parser.add_argument("-g", "--gid", dest="gid", help="set numerical group ID", metavar="GID")
-        set_parser.add_argument("--unposix", dest="unposix", action="store_true", help="remove POSIX attributes from group")
 
         get_parser = modparsers.add_parser("getent", help="get getent like output for one, more, or all POSIX groups")
         get_parser.add_argument("group", nargs='*', help="group to list")
@@ -49,6 +48,10 @@ class ManageGroups(Command):
         rem_parser = modparsers.add_parser("rem", help="remove users from group")
         rem_parser.add_argument("group", help="group to remove users from")
         rem_parser.add_argument("users", nargs="+", help="users to remove")
+
+        unposix_parser = modparsers.add_parser("unposix", help="remove POSIX attributes from groups")
+        unposix_parser.add_argument("--unposix-all-groups", action="store_true", dest="all", help="confirm complete removal of POSIX settings from all groups - only if no groups are specified!")
+        unposix_parser.add_argument("group", nargs='*', help="groups to remove POSIX attributes from")
 
         return True
 
@@ -75,6 +78,33 @@ class ManageGroups(Command):
             print group.formatAsGetent(self.LDAP)
         return 0
 
+    def _unposix(self, group):
+        modify = []
+        if group.hasAttribute('gidNumber'):
+            modify += [(ldap.MOD_DELETE, 'gidNumber', None)]
+        if group.hasAttribute('objectClass', 'posixGroup'):
+            modify += [(ldap.MOD_DELETE, 'objectClass', 'posixGroup')]
+
+        if len(modify) > 0:
+            self.LDAP.modify(group.dn(), modify)
+
+    def do_unposix(self):
+        if len(self.opts['group']) == 0:
+            if not self.opts['all'] is True:
+                self.Logger.error("You must either specify a list of groups to remove POSIX from, or supply --unposix-all-groups")
+                return 5
+            for group in Group.posixGroups(self.LDAP):
+                self._unposix(group)
+        else:
+            for name in self.opts['group']:
+                group = self._byName(name)
+                if group is False:
+                    log = Logger()
+                    log.error("Group %s does not exist!" % name)
+                    return 1
+                self._unposix(group)
+        return 0
+
     def do_set(self):
         group = self._byName(self.opts['group'])
         if group is False:
@@ -82,27 +112,21 @@ class ManageGroups(Command):
             return 1
 
         modify = []
-        if self.opts['unposix'] is True:
-            if group.hasAttribute('gidNumber'):
-                modify += [(ldap.MOD_DELETE, 'gidNumber', None)]
-            if group.hasAttribute('objectClass', 'posixGroup'):
-                modify += [(ldap.MOD_DELETE, 'objectClass', 'posixGroup')]
-        else:
-            if self.opts['gid'] is not None and not Validator.checkPosixID(self.opts['gid']):
-                self.Logger.error("%s is an invalid group ID" % self.opts['gid'])
-                return 5
+        if self.opts['gid'] is not None and not Validator.checkPosixID(self.opts['gid']):
+            self.Logger.error("%s is an invalid group ID" % self.opts['gid'])
+            return 5
 
-            if not group.hasAttribute('objectClass', 'posixGroup'):
-                modify += [(ldap.MOD_ADD, 'objectClass', 'posixGroup')]
+        if not group.hasAttribute('objectClass', 'posixGroup'):
+            modify += [(ldap.MOD_ADD, 'objectClass', 'posixGroup')]
 
-            gid = group.getSingleValue('gidNumber')
-            if gid is None:
-                if self.opts['gid'] is None:
-                    raise InvalidCommand("group set %s -- no gid assigned nor specified" % self.opts['group'])
+        gid = group.getSingleValue('gidNumber')
+        if gid is None:
+            if self.opts['gid'] is None:
+                raise InvalidCommand("group set %s -- no gid assigned nor specified" % self.opts['group'])
 
-                modify += [(ldap.MOD_ADD, 'gidNumber', self.opts['gid'])]
-            elif gid != self.opts['gid']:
-                modify += [(ldap.MOD_REPLACE, 'gidNumber', self.opts['gid'])]
+            modify += [(ldap.MOD_ADD, 'gidNumber', self.opts['gid'])]
+        elif gid != self.opts['gid']:
+            modify += [(ldap.MOD_REPLACE, 'gidNumber', self.opts['gid'])]
 
         if len(modify) > 0:
             self.LDAP.modify(group.dn(), modify)
@@ -166,5 +190,7 @@ class ManageGroups(Command):
             return self.do_add()
         if self.command == "rem":
             return self.do_remove()
+        if self.command == "unposix":
+            return self.do_unposix()
 
         raise InvalidCommand("group %s unknown" % self.command)
