@@ -93,6 +93,12 @@ class User(LDAPEntry):
             yield cls(result)
 
     @classmethod
+    def filterUsers(cls,oLDAP, filt = '(&(objectClass=user)(uidNumber=*))'):
+        results = oLDAP.search(filt, True)
+        for result in results:
+            yield cls(result)
+
+    @classmethod
     def byDN(cls, dn, oLDAP):
         try:
             ldap.dn.str2dn(dn)

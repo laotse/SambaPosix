@@ -51,6 +51,10 @@ class ManageUsers(Command):
         unposix_parser.add_argument("--unposix-all-users", action="store_true", dest="all", help="confirm complete removal of POSIX settings from all users - only if no users are specified!")
         unposix_parser.add_argument("user", nargs='*', help="users to remove POSIX attributes from")
 
+        fix_parser = modparsers.add_parser("fix", help="make POSIX attributes consistent and adhere to chosen profile")
+        fix_parser.add_argument("--fix-all-users", action="store_true", dest="all", help="confirm fixing all users with POSIX touch - only if no users are specified!")
+        fix_parser.add_argument("user", nargs='*', help="users to fix POSIX attributes")
+
         return True
 
     def _byName(self, name):
@@ -250,6 +254,85 @@ class ManageUsers(Command):
         if len(modify) > 0:
             self.LDAP.modify(user.dn(), modify)
 
+    def _fix(self, user):
+        modify = []
+        try:
+            uid = user.getSingleValue('uidNumber')
+        except IndexError:
+            uid = None
+        if uid is None:
+            self._unposix(user)
+            return
+
+        if user.hasAttribute('objectClass', 'posixAccount') and not self.LDAP.schema().objectClass():
+            modify += [(ldap.MOD_DELETE, 'objectClass', 'posixAccount')]
+        elif not user.hasAttribute('objectClass', 'posixAccount') and self.LDAP.schema().objectClass():
+            modify += [(ldap.MOD_ADD, 'objectClass', 'posixAccount')]
+
+        if not user.hasAttribute('uid'):
+            if not user.hasAttribute('sAMAccountName'):
+                self._unposix(user)
+                return
+            name = user.getSingleValue('sAMAccountName')
+            modify += [self.makeModify(user, name, 'uid')]
+        else:
+            name = user.getSingleValue('uid')
+
+        modify += [self.makeModify(user, name, 'msSFU30Name', self.LDAP.schema().msRFU())]
+        modify += [self.makeModify(user, self.LDAP.nis(), 'msSFU30NisDomain', self.LDAP.schema().msRFU())]
+
+        if not user.hasAttribute('unixUserPassword'):
+            modify += [self.makeModify(user, 'ABCD!efgh12345$67890', 'unixUserPassword', self.LDAP.schema().msRFU())]
+
+        # TODO: we cannot fix things like loginShell, unixHomeDirectory unless we have a template
+        # TODO: GECOS could be set from the current CN
+
+        gid = user.getSingleValue('gidNumber')
+        rid = user.getSingleValue('primaryGroupID')
+        if not gid is None:
+            group = Group.byGID(gid, self.LDAP)
+            if group is not None:
+                modify += [self.makeModify(user, str(group.getRID()), 'primaryGroupID')]
+            else:
+                gid = None
+                # fall through
+        if gid is None:
+            if rid is None:
+                self._unposix(user)
+                return
+            group = Group.byRID(rid, self.LDAP, user)
+            if group is None:
+                self._unposix(user)
+                return
+            gid = group.getSingleValue('gidNumber')
+            if gid is None:
+                self._unposix(user)
+                return
+            modify += [self.makeModify(user, str(gid), 'gidNumber')]
+
+        modify = [x for x in modify if not x is None]
+        if len(modify) > 0:
+            self.LDAP.modify(user.dn(), modify)
+
+        # TODO: find groups we're listed as members and set memberOf here
+
+    def do_fix(self):
+        if len(self.opts['user']) == 0:
+            if not self.opts['all'] is True:
+                self.Logger.error("You must either specify a list of users to fix POSIX, or supply --fix-all-users")
+                return 5
+            for user in User.filterUsers(self.LDAP, '(&(objectClass=user)(|(uidNumber=*)(objectClass=posixAccount)))'):
+                self._fix(user)
+        else:
+            for name in self.opts['user']:
+                user = self._byName(name)
+                if user is False:
+                    log = Logger()
+                    log.error("User %s does not exist!" % name)
+                    return 1
+                self._fix(user)
+        return 0
+
     def do_run(self):
         if self.command == "getent":
             return self.do_getent()
@@ -261,5 +344,7 @@ class ManageUsers(Command):
             return self.do_set()
         if self.command == "unposix":
             return self.do_unposix()
+        if self.command == "fix":
+            return self.do_fix()
         raise InvalidCommand("user %s unknown" % self.command)
 
