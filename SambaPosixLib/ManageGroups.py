@@ -116,8 +116,10 @@ class ManageGroups(Command):
             self.Logger.error("%s is an invalid group ID" % self.opts['gid'])
             return 5
 
-        if not group.hasAttribute('objectClass', 'posixGroup'):
+        if not group.hasAttribute('objectClass', 'posixGroup') and self.LDAP.schema().objectClass():
             modify += [(ldap.MOD_ADD, 'objectClass', 'posixGroup')]
+        elif group.hasAttribute('objectClass', 'posixGroup') and not self.LDAP.schema().objectClass():
+            modify += [(ldap.MOD_DELETE, 'objectClass', 'posixGroup')]
 
         gid = group.getSingleValue('gidNumber')
         if gid is None:
