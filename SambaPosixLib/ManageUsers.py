@@ -310,9 +310,10 @@ class ManageUsers(Command):
                 return
             modify += [self.makeModify(user, str(gid), 'gidNumber')]
 
-        for group in Group.byMemberDN(user.dn(), self.LDAP):
-            if not user.hasAttribute('memberOf', group.dn()):
-                modify += [(ldap.MOD_ADD, 'memberOf', group.dn())]
+        # 'linked attribute' is maintained automatically by AD
+        #for group in Group.byMemberDN(user.dn(), self.LDAP):
+        #    if not user.hasAttribute('memberOf', group.dn()):
+        #        modify += [(ldap.MOD_ADD, 'memberOf', group.dn())]
 
         modify = [x for x in modify if not x is None]
         if len(modify) > 0:

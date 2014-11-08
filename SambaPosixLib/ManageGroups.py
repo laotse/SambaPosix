@@ -76,6 +76,7 @@ class ManageGroups(Command):
                 if group is False:
                     self.Logger.error("Group %s does not exist!" % name)
                     return 1
+                # FIXME: collect all users, which have us as primaryGID
                 print group.formatAsGetent(self.LDAP)
             return 0
         for group in Group.posixGroups(self.LDAP):
@@ -192,16 +193,19 @@ class ManageGroups(Command):
             if oUser is None:
                 self.error("Unknown user %s -- skipped" % user)
             else:
+                # TODO: if group is primaryGroupID of user, we're in it, w/o having a member attribute
                 if not group.hasAttribute('member', oUser.dn()):
                     modify += [(ldap.MOD_ADD, 'member', oUser.dn())]
 
-                if not oUser.hasAttribute('memberOf', group.dn()):
-                    self.LDAP.modify(oUser.dn(), [(ldap.MOD_ADD, 'memberOf', group.dn())])
+                # 'linked attribute' maintained automatically by AD
+                # if not oUser.hasAttribute('memberOf', group.dn()):
+                #    self.LDAP.modify(oUser.dn(), [(ldap.MOD_ADD, 'memberOf', group.dn())])
 
         if len(modify) > 0:
             self.LDAP.modify(group.dn(), modify)
 
     def do_remove(self):
+        # FIXME: If user has us as primaryGID, we cannot remove!
         group = self._byName(self.opts['group'])
         if group is False:
             self.Logger.error("Group %s specified for adding users does not exist" % self.opts['group'])
