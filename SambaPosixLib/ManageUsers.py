@@ -310,11 +310,19 @@ class ManageUsers(Command):
                 return
             modify += [self.makeModify(user, str(gid), 'gidNumber')]
 
+        for group in Group.byMemberDN(user.dn(), self.LDAP):
+            if not user.hasAttribute('memberOf', group.dn()):
+                modify += [(ldap.MOD_ADD, 'memberOf', group.dn())]
+
         modify = [x for x in modify if not x is None]
         if len(modify) > 0:
             self.LDAP.modify(user.dn(), modify)
 
-        # TODO: find groups we're listed as members and set memberOf here
+        for groupDN in user.values('memberOf'):
+            group = Group.byDN(groupDN, self.LDAP)
+            if not group.hasAttribute('member', user.dn()):
+                self.LDAP.modify(group.dn(),[(ldap.MOD_ADD, 'member', user.dn())])
+
 
     def do_fix(self):
         if len(self.opts['user']) == 0:

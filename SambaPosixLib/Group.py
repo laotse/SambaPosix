@@ -76,6 +76,18 @@ class Group(LDAPEntry):
         return cls(entries[0])
 
     @classmethod
+    def byDN(cls, dn, oLDAP):
+        log = Logger()
+        entry = oLDAP.readDN(dn)
+        if entry is None:
+            log.trace("Group DN: %s not found" % dn)
+            return False
+        if not 'objectClass' in entry[1] or not 'group' in entry[1]['objectClass']:
+            log.error("Group DN: %s no group" % dn)
+            return False
+        return cls(entry)
+
+    @classmethod
     def byMemberDN(cls, dn, oLDAP):
         entries = oLDAP.search('(&(objectClass=group)(member=%s))' % dn)
         for group in entries:

@@ -124,7 +124,7 @@ class ManageGroups(Command):
         elif not group.hasAttribute('objectClass', 'posixGroup') and self.LDAP.schema().objectClass():
             modify += [(ldap.MOD_ADD, 'objectClass', 'posixGroup')]
 
-        # TODO: check memberOf of members
+        # TODO: check memberOf of members - more complex than for users due to group nesting
 
         modify = [x for x in modify if not x is None]
         if len(modify) > 0:
