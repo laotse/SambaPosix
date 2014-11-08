@@ -4,7 +4,7 @@ Created on 28.10.2014
 @author: mgr
 '''
 
-import ldap, ldap.sasl
+import ldap, ldap.sasl, ldap.dn
 import getpass
 import base64,re,struct
 
@@ -126,6 +126,7 @@ class LDAPQuery(object):
         if not self.connect(privileged):
             return None
         try:
+            self.Logger.trace("Filter LDAP: %s" % query)
             results = self.LDAP.search_s(self.Base, ldap.SCOPE_SUBTREE, query)
             # a list of tuples(DN, dict(item: [values as strings]))
         except ldap.LDAPError, error:
@@ -250,21 +251,14 @@ class LDAPQuery(object):
 
     def getDomainSID(self, sid = None, rid=None, raw = False):
         if self.domainSID is None:
-            # FIXME: domainSID is the objectSid of self.Base
-            if sid is None:
-                sid = self.readDN("CN=Administrator,"+self.Base, True)
-                if sid is None:
-                    raise ValueError("Cannot find Administrator account in LDAP")
-                sid = sid[1]['objectSid'][0]
-            if not isinstance(sid, str) and hasattr(sid, '__contains__'):
-                if 'objectSid' in sid: sid = sid['objectSid'][0]
-            if sid is not None and not isinstance(sid, str):
-                print sid
-                raise TypeError("Cannot convert %s to SID" % str(type(sid)))
-            if not re.match('^S(?:-[0-9]{1,10}){3,7}$', sid):
-                # this is a binary representation
-                sid = self.decodeSID(sid)
-            self.domainSID = "-".join(sid.split('-')[:-1])
+            # self.Base is "CN=Users," + BASE (see oConfig.extendBase("CN=Users,") in SamabaPosxi.py)
+            domainBase = ldap.dn.dn2str(ldap.dn.str2dn(self.Base)[1:])
+            domain = self.readDN(domainBase, True)
+            if domain is not None and 'objectSid' in domain[1]:
+                sid = domain[1]['objectSid'][0]
+            else:
+                raise ValueError("Domain entry has no objectSID")
+            self.domainSID = self.decodeSID(sid)
 
         domainSID = self.domainSID
         if not rid is None:
