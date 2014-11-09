@@ -81,10 +81,7 @@ class ManageGroups(Command):
                 if self.opts['primaries'] is True:
                     rid = group.getRID()
                     for user in User.filterUsers(self.LDAP, '(&(objectClass=user)(uidNumber=*)(primaryGroupID=%d))' % rid):
-                        if user.hasAttribute('uid'):
-                            primaryUsers += [user.getSingleValue('uid')]
-                        else:
-                            primaryUsers += [user.getSingleValue('sAMAccountName')]
+                        primaryUsers += [user.getName()]
                 print group.formatAsGetent(self.LDAP, primaryUsers)
             return 0
         for group in Group.posixGroups(self.LDAP):
@@ -199,11 +196,16 @@ class ManageGroups(Command):
                 continue
             oUser = User.byAccount(user, self.LDAP)
             if oUser is None:
-                self.error("Unknown user %s -- skipped" % user)
+                self.Logger.error("Unknown user %s -- skipped" % user)
             else:
-                # TODO: if group is primaryGroupID of user, we're in it, w/o having a member attribute
-                if not group.hasAttribute('member', oUser.dn()):
-                    modify += [(ldap.MOD_ADD, 'member', oUser.dn())]
+                pgRID = oUser.getSingleValue('primaryGroupID')
+                if int(pgRID) == group.getRID():
+                    self.Logger.info('User %s has group %s as primary group, i.e. is already a member' % (oUser.getName(),group.getSingleValue('sAMAccountName')))
+                else:
+                    if not group.hasAttribute('member', oUser.dn()):
+                        modify += [(ldap.MOD_ADD, 'member', oUser.dn())]
+                    else:
+                        self.Logger.info('User %s is member of  %s, already' % (oUser.getName(),group.getSingleValue('sAMAccountName')))
 
                 # 'linked attribute' maintained automatically by AD
                 # if not oUser.hasAttribute('memberOf', group.dn()):
@@ -228,15 +230,19 @@ class ManageGroups(Command):
             if oUser is None:
                 self.error("Unknown user %s -- skipped" % user)
             else:
-                if group.hasAttribute('member', oUser.dn()):
-                    modify += [(ldap.MOD_DELETE, 'member', oUser.dn())]
+                primaryRID = oUser.getSingleValue('primaryGroupID')
+                if int(primaryRID) == group.getRID():
+                    self.Logger.info("User %s has %s as primary group -- cannot remove user" % (oUser.getName(), group.getSingleValue('sAMAccountName')))
+                else:
+                    if group.hasAttribute('member', oUser.dn()):
+                        modify += [(ldap.MOD_DELETE, 'member', oUser.dn())]
 
-                if oUser.hasAttribute('memberOf', group.dn()):
-                    self.LDAP.modify(oUser.dn(), [(ldap.MOD_DELETE, 'memberOf', group.dn())])
+                # memberOf is mainatained automatically by AD
+                #if oUser.hasAttribute('memberOf', group.dn()):
+                #    self.LDAP.modify(oUser.dn(), [(ldap.MOD_DELETE, 'memberOf', group.dn())])
 
         if len(modify) > 0:
             self.LDAP.modify(group.dn(), modify)
-
 
 
     def do_run(self):

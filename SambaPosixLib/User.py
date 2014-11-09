@@ -144,3 +144,8 @@ class User(LDAPEntry):
         out += values[3]
         return out
 
+    def getName(self):
+        name = self.getSingleValue('uid')
+        if name is None or not isinstance(name, str):
+            name = self.getSingleValue('sAMAccountName')
+        return name
