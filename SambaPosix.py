@@ -63,16 +63,16 @@ def main(argv = None):
 
     # FIXME: should be a NETLOGON, but nothing seems to support CLDAP
     # however https://github.com/geertj/python-ad/blob/master/lib/ad/protocol/netlogon.py might help
-    parsed_url = urlparse(oConfig.URI, 'ldap')
-    fqdn = socket.getfqdn(re.sub(':\d+$','',parsed_url[1]))
-    domain = fqdn.split('.')[1]
+    #parsed_url = urlparse(oConfig.URI, 'ldap')
+    #fqdn = socket.getfqdn(re.sub(':\d+$','',parsed_url[1]))
+    #domain = fqdn.split('.')[1]
 
     parser.set_defaults(base=oConfig.Base,
                         url=oConfig.URI,
                         dry_run=False,
                         verbose=0,
                         bind_user=None,
-                        workgroup=domain.upper(),
+                        workgroup=None,
                         schema=os.getenv('SAMBA_POSIX_SCHEME',"hybrid"))
 
     parser.add_argument("-V", "--version", action='version', version=program_version_string)
@@ -84,7 +84,7 @@ def main(argv = None):
     group.add_argument("-b", "--base", dest="base", help="Base DN [default: %(default)s]", metavar="DN")
     group.add_argument("-U", "--bind-user", dest="bind_user", help="User for simple bind", metavar="CN | uid")
     group.add_argument("--no-tls", dest="noTLS", action="store_true", help="Don't use TLS for simple bind")
-    group.add_argument("-W", "--workgroup", dest="workgroup", help="NETBIOS name of AD [default: %(default)s]", metavar="WORKGROUP")
+    group.add_argument("-W", "--workgroup", dest="workgroup", help="NETBIOS name of AD", metavar="WORKGROUP")
     schema = parser.add_mutually_exclusive_group()
     schema.add_argument("--rfc2307", dest="schema", action="store_const", const="ldap", help="use LDAP schema compliant POSIX entries")
     schema.add_argument("--ADUC", dest="schema", action="store_const", const="aduc", help="simulate entries created by ADUC")
@@ -109,15 +109,20 @@ def main(argv = None):
     else:
         oLDAP = LDAPQuery(oConfig)
 
-    NIS = NisDomain()
-    NIS.nis(opts['workgroup'])
-
     if opts['dry_run'] is True:
         oLDAP.setDry()
 
+    NIS = NisDomain()
     if not NIS.setSchema(opts['schema']):
         log.error("Unknown database schema: %s" % opts['schema'])
         return 5
+
+    if opts['workgroup'] is None and NIS.msRFU():
+        if not NIS.getNisDomain(oLDAP):
+            log.error("Cannot determine NIS domain")
+            return 5
+    elif opts['workgroup'] is not None:
+        NIS.getNisDomain(opts['workgroup'])
 
     try:
         for module in program_modules:

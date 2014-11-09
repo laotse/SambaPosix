@@ -111,8 +111,11 @@ class LDAPQuery(object):
     def search(self, query, privileged = False):
         return self._search(self.Base, query, privileged)
 
-    def searchRoot(self, query, privileged = False):
-        return self._search(self.Root, query, privileged)
+    def searchRoot(self, path, query, privileged = False):
+        path = path.strip()
+        if len(path) > 0 and path[-1] != ',':
+            path += ','
+        return self._search(path + self.Root, query, privileged)
 
     def readDN(self, dn, privileged = False):
         if not self.connect(privileged):

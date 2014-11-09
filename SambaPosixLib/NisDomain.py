@@ -8,7 +8,8 @@ import re, base64, struct
 import ldap.dn
 
 from SambaPosixLib.Singleton import Singleton
-from gconf import Schema
+from SambaPosixLib.LDAPEntry import LDAPEntry
+from SambaPosixLib.Logger import Logger
 
 class NisDomain(object):
     __metaclass__ = Singleton
@@ -191,8 +192,67 @@ class NisDomain(object):
             domainSID += "-%s" % rid
         return self.encodeSID(domainSID, raw)
 
-    def nis(self, domain = None):
-        # FIXME: should rather perform NETLOGON
-        if domain is not None:
-            self.nisDomain = domain.lower()
-        return self.nisDomain
+    def getNisDomain(self, oLDAP):
+        log = Logger()
+        if isinstance(oLDAP, str):
+            self.nisDomain = oLDAP.lower()
+            log.trace("NIS domain set to: %s" % self.nisDomain)
+            return True
+
+        results = oLDAP.searchRoot('CN=ypservers,CN=ypServ30,CN=RpcServices,CN=System,','(msSFU30Domains=*)', True)
+        if results is None:
+            self.nisDomain = None
+            return False
+        domains = dict()
+        for entry in results:
+            info = LDAPEntry(entry)
+            for domain in info.values('msSFU30Domains'):
+                domains[domain] = True
+        domains = domains.keys()
+        if len(domains) < 1:
+            self.nisDomain = None
+            return False
+        if len(domains) > 1:
+            log.error("Multiple domains unsupported - choose on of %s for -W option" % " ,".join(domains))
+            return False
+        self.nisDomain = domains[0]
+        log.trace("NIS domain set to: %s" % self.nisDomain)
+        return True
+
+"""
+If you really want your script to be of use, convert these bash script excerpts to python:
+
+# Finds the next useable user uidNumber or group gidNumber
+# Input : $1
+# $1 : msSFU30MaxUidNumber or msSFU30MaxGidNumber
+# Output : the first free uidNumber or gidNumber
+_findnext () {
+  _NEXTID=$($LDBSEARCHBIN -H $DBPATH -b "CN=$LDOMAIN,CN=ypservers,CN=ypServ30,CN=RpcServices,CN=System,$SUFFIX" -s sub '(objectClass=msSFU30DomainInfo)' $1 | grep "$1: " | awk '{print $NF}')
+  if [ -z "$_NEXTID" ] || [ "$_NEXTID" -lt "$IDSTART" ]; then
+    _NEXTID="$IDSTART"
+  fi
+}
+
+# UPDATE msSFU30MaxUidNumber/msSFU30MaxGidNumber
+# Input : $1 $2
+# $1: what to update (msSFU30MaxUidNumber or msSFU30MaxGidNumber)
+# $2: Next Number
+#
+# Output : Nothing
+_updatemax () {
+log_output "Updating $1"
+
+echo "dn: CN=$LDOMAIN,CN=ypservers,CN=ypServ30,CN=RpcServices,CN=System,$SUFFIX
+changetype: modify
+replace: $1
+$1: $2" > /tmp/newgid
+
+$LDBMODIFYBIN --url=$KERBEROS /tmp/newgid  2>>"$LOGFILE" 1>/dev/null
+if [ $? != 0 ]; then
+    log_output "Error updating $1 in AD."
+    exit 1 # exits here if error
+fi
+rm -f /tmp/newgid
+log_output "Successfully updated $1 in AD"
+}
+"""
