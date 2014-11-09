@@ -6,10 +6,10 @@ Created on 30.10.2014
 import ldap.filter
 
 from SambaPosixLib.LDAPEntry import LDAPEntry
-from SambaPosixLib.LDAPQuery import LDAPQuery
 from SambaPosixLib.Logger import Logger
 from SambaPosixLib.PosixValidator import PosixValidator as Validator
 from __builtin__ import classmethod
+from SambaPosixLib.NisDomain import NisDomain
 
 class Group(LDAPEntry):
     '''
@@ -46,7 +46,8 @@ class Group(LDAPEntry):
         if not Validator.checkPosixID(gid):
             log.error("%s is no valid POSIX GID" % gid)
             return False
-        if oLDAP.schema().objectClass():
+        NIS = NisDomain()
+        if NIS.objectClass():
             entries = oLDAP.search('(&(objectClass=posixGroup)(gidNumber=%s))' % gid, True)
         else:
             entries = oLDAP.search('(&(objectClass=group)(gidNumber=%s))' % gid, True)
@@ -96,7 +97,8 @@ class Group(LDAPEntry):
     @classmethod
     def posixGroups(cls, oLDAP):
         log = Logger()
-        if oLDAP.schema().objectClass():
+        NIS = NisDomain()
+        if NIS.objectClass():
             entries = oLDAP.search('(&(objectClass=posixGroup)(objectClass=group))', True)
         else:
             entries = oLDAP.search('(&(objectClass=group)(gidNumber=*))', True)
@@ -124,9 +126,10 @@ class Group(LDAPEntry):
             if member is None:
                 self.Logger.error("Group member %s does not exist" % dn)
             else:
+                NIS = NisDomain()
                 member = LDAPEntry(member)
                 if member.hasAttribute('objectClass','user'):
-                    if not oLDAP.schema().objectClass() or member.hasAttribute('objectClass','posixAccount'):
+                    if not NIS.objectClass() or member.hasAttribute('objectClass','posixAccount'):
                         t = member.getSingleValue('uid')
                         if t is None:
                             t = member.getSingleValue('sAMAccountName')
@@ -156,5 +159,5 @@ class Group(LDAPEntry):
     def getRID(self):
         if not 'objectSid' in self:
             raise ValueError("Group object has no SID")
-        sid = LDAPQuery.decodeSID(self['objectSid'][0])
+        sid = NisDomain.decodeSID(self['objectSid'][0])
         return int(sid.split('-')[-1])

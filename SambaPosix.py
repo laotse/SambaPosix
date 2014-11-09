@@ -16,7 +16,7 @@ Toolsuite to manage POSIX users in an AD
 '''
 from SambaPosixLib.Logger import Logger
 
-from SambaPosixLib.LDAPQuery import LDAPQuery, SchemaOptions
+from SambaPosixLib.LDAPQuery import LDAPQuery
 from SambaPosixLib.LDAPConf import LDAPConf
 
 from SambaPosixLib.ManageUsers import ManageUsers
@@ -27,6 +27,7 @@ from SambaPosixLib.Command import InvalidCommand
 import sys,os,re,socket
 import argparse
 from urlparse import urlparse
+from SambaPosixLib.NisDomain import NisDomain
 
 __all__ = []
 __version__ = 0.2
@@ -108,25 +109,15 @@ def main(argv = None):
     else:
         oLDAP = LDAPQuery(oConfig)
 
-    oLDAP.nis(opts['workgroup'])
+    NIS = NisDomain()
+    NIS.nis(opts['workgroup'])
 
     if opts['dry_run'] is True:
         oLDAP.setDry()
 
-    schema = SchemaOptions()
-    if opts['schema'] == 'ldap':
-        schema.msRFU(False)
-        schema.objectClass(True)
-    elif opts['schema'] == 'aduc':
-        schema.msRFU(True)
-        schema.objectClass(False)
-    elif opts['schema'] == 'hybrid':
-        schema.msRFU(True)
-        schema.objectClass(True)
-    else:
+    if not NIS.setSchema(opts['schema']):
         log.error("Unknown database schema: %s" % opts['schema'])
         return 5
-    oLDAP.schema(schema)
 
     try:
         for module in program_modules:

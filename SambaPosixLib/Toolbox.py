@@ -7,6 +7,7 @@ import re, base64
 
 from SambaPosixLib.Logger import Logger
 from SambaPosixLib.Command import Command, InvalidCommand
+from SambaPosixLib.NisDomain import NisDomain
 
 class Toolbox(Command):
     '''
@@ -38,12 +39,12 @@ class Toolbox(Command):
         log = Logger()
         raw = self.opts['raw']
         if self.opts['encode']:
-            res = self.LDAP.encodeSID(self.opts['sid'], raw)
+            res = NisDomain.encodeSID(self.opts['sid'], raw)
         elif self.opts['decode']:
-            res = self.LDAP.decodeSID(self.opts['sid'])
+            res = NisDomain.decodeSID(self.opts['sid'])
         else:
             if re.match('^S(?:-[0-9]{1,10}){3,7}$', self.opts['sid']):
-                res = self.LDAP.encodeSID(self.opts['sid'], raw)
+                res = NisDomain.encodeSID(self.opts['sid'], raw)
             elif re.match('^[A-Za-z0-9+/]+={0,2}$',self.opts['sid']):
                 if raw:
                     res = base64.b64decode(self.opts['sid'])

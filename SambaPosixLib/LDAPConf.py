@@ -11,7 +11,8 @@ from SambaPosixLib.Logger import Logger
 
 class LDAPConf(object):
     '''
-    classdocs
+    This is just a container to pass data to LDAPQuery
+    with some intelligence built in.
     '''
 
 
@@ -21,6 +22,7 @@ class LDAPConf(object):
         '''
         self.URI = None
         self.Base = None
+        self.Root = None
         self.noTLS = True
 
     def parseConf(self, fname):
@@ -38,6 +40,7 @@ class LDAPConf(object):
                         self.setURI(res.group(2))
                     elif res.group(1) == 'BASE':
                         self.Base = res.group(2)
+                        self.Root = self.Base
                     elif res.group(1) == "TLS_CACERT":
                         self.noTLS = False
 
@@ -66,6 +69,8 @@ class LDAPConf(object):
             raise ValueError("Invalid base DN: %s" % base)
 
         self.Base = base
+        if self.Root is None:
+            self.Root = self.Base
 
     def extendBase(self, rdn):
         self.setBase(rdn + self.Base)

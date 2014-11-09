@@ -9,6 +9,7 @@ from SambaPosixLib.LDAPQuery import LDAPQuery
 from SambaPosixLib.LDAPEntry import LDAPEntry
 from SambaPosixLib.Logger import Logger
 from SambaPosixLib.PosixValidator import PosixValidator as Validator, ADValidator
+from SambaPosixLib.NisDomain import NisDomain
 
 class User(LDAPEntry):
     '''
@@ -44,7 +45,8 @@ class User(LDAPEntry):
         if not Validator.checkPosixID(uid):
             log.error("%s is no valid POSIX user id")
             return False
-        if oLDAP.schema().objectClass():
+        NIS = NisDomain()
+        if NIS.objectClass():
             results = oLDAP.search('(&(objectClass=posixAccount)(objectClass=user)(uidNumber=%s))' % uid, True)
         else:
             results = oLDAP.search('(&(objectClass=user)(uidNumber=%s))' % uid, True)
@@ -84,7 +86,8 @@ class User(LDAPEntry):
 
     @classmethod
     def posixUsers(cls,oLDAP):
-        if oLDAP.schema().objectClass():
+        NIS = NisDomain()
+        if NIS.objectClass():
             results = oLDAP.search('(&(objectClass=posixAccount)(objectClass=user))', True)
         else:
             results = oLDAP.search('(&(objectClass=user)(uidNumber=*))', True)

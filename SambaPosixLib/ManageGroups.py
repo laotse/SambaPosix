@@ -12,6 +12,7 @@ from SambaPosixLib.PosixValidator import PosixValidator as Validator
 from SambaPosixLib.Command import Command, InvalidCommand
 from SambaPosixLib.Group import Group
 from SambaPosixLib.User import User
+from SambaPosixLib.NisDomain import NisDomain
 
 class ManageGroups(Command):
     '''
@@ -125,9 +126,10 @@ class ManageGroups(Command):
             self._unposix(group)
             return
 
-        if group.hasAttribute('objectClass', 'posixGroup') and not self.LDAP.schema().objectClass():
+        NIS = NisDomain()
+        if group.hasAttribute('objectClass', 'posixGroup') and not NIS.objectClass():
             modify += [(ldap.MOD_DELETE, 'objectClass', 'posixGroup')]
-        elif not group.hasAttribute('objectClass', 'posixGroup') and self.LDAP.schema().objectClass():
+        elif not group.hasAttribute('objectClass', 'posixGroup') and NIS.objectClass():
             modify += [(ldap.MOD_ADD, 'objectClass', 'posixGroup')]
 
         # TODO: check memberOf of members - more complex than for users due to group nesting
@@ -164,9 +166,10 @@ class ManageGroups(Command):
             self.Logger.error("%s is an invalid group ID" % self.opts['gid'])
             return 5
 
-        if not group.hasAttribute('objectClass', 'posixGroup') and self.LDAP.schema().objectClass():
+        NIS = NisDomain()
+        if not group.hasAttribute('objectClass', 'posixGroup') and NIS.objectClass():
             modify += [(ldap.MOD_ADD, 'objectClass', 'posixGroup')]
-        elif group.hasAttribute('objectClass', 'posixGroup') and not self.LDAP.schema().objectClass():
+        elif group.hasAttribute('objectClass', 'posixGroup') and not NIS.objectClass():
             modify += [(ldap.MOD_DELETE, 'objectClass', 'posixGroup')]
 
         gid = group.getSingleValue('gidNumber')

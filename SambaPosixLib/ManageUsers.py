@@ -10,6 +10,7 @@ from SambaPosixLib.Command import Command, InvalidCommand
 from SambaPosixLib.User import User
 from SambaPosixLib.Group import Group
 from SambaPosixLib.PosixValidator import PosixValidator as Validator
+from SambaPosixLib.NisDomain import NisDomain
 
 class ManageUsers(Command):
     '''
@@ -80,7 +81,6 @@ class ManageUsers(Command):
 
         if len(modify) > 0:
             self.LDAP.modify(user.dn(), modify)
-
 
     def do_unposix(self):
         if len(self.opts['user']) == 0:
@@ -189,6 +189,7 @@ class ManageUsers(Command):
         return (ldap.MOD_REPLACE, attribute, val)
 
     def do_set(self):
+        # TODO: add interactive mode
         # sanitize options
         try:
             if not Validator.checkPosixID(self.opts['uid']):
@@ -214,6 +215,7 @@ class ManageUsers(Command):
             self.Logger.error(str(e))
             return 5
 
+        NIS = NisDomain()
         user = self._byName(self.opts['user'])
         if user is None:
             self.error("User %s not found in AD" % self.opts['user'])
@@ -221,13 +223,13 @@ class ManageUsers(Command):
 
         name = user.getSingleValue('sAMAccountName')
         modify = []
-        if not user.hasAttribute('objectClass', 'posixAccount') and self.LDAP.schema().objectClass():
+        if not user.hasAttribute('objectClass', 'posixAccount') and NIS.objectClass():
             modify += [(ldap.MOD_ADD, 'objectClass', 'posixAccount')]
-        elif user.hasAttribute('objectClass', 'posixAccount') and not self.LDAP.schema().objectClass():
+        elif user.hasAttribute('objectClass', 'posixAccount') and not NIS.objectClass():
             modify += [(ldap.MOD_DELETE, 'objectClass', 'posixAccount')]
         modify += [self.makeModify(user, name, 'uid')]
-        modify += [self.makeModify(user, name, 'msSFU30Name', self.LDAP.schema().msRFU())]
-        modify += [self.makeModify(user, self.LDAP.nis(), 'msSFU30NisDomain', self.LDAP.schema().msRFU())]
+        modify += [self.makeModify(user, name, 'msSFU30Name', NIS.msRFU())]
+        modify += [self.makeModify(user, self.LDAP.nis(), 'msSFU30NisDomain', NIS.msRFU())]
 
         modify += [self.makeModify(user, self.opts['uid'], 'uidNumber')]
         # TODO: auto-add user to group, if gid is given?
@@ -248,7 +250,7 @@ class ManageUsers(Command):
         modify += [self.makeModify(user, self.opts['shell'], 'loginShell')]
         modify += [self.makeModify(user, self.opts['gecos'], 'gecos')]
 
-        modify += [self.makeModify(user, 'ABCD!efgh12345$67890', 'unixUserPassword', self.LDAP.schema().msRFU())]
+        modify += [self.makeModify(user, 'ABCD!efgh12345$67890', 'unixUserPassword', NIS.msRFU())]
 
         modify = [x for x in modify if not x is None]
         if len(modify) > 0:
@@ -264,9 +266,10 @@ class ManageUsers(Command):
             self._unposix(user)
             return
 
-        if user.hasAttribute('objectClass', 'posixAccount') and not self.LDAP.schema().objectClass():
+        NIS = NisDomain()
+        if user.hasAttribute('objectClass', 'posixAccount') and not NIS.objectClass():
             modify += [(ldap.MOD_DELETE, 'objectClass', 'posixAccount')]
-        elif not user.hasAttribute('objectClass', 'posixAccount') and self.LDAP.schema().objectClass():
+        elif not user.hasAttribute('objectClass', 'posixAccount') and NIS.objectClass():
             modify += [(ldap.MOD_ADD, 'objectClass', 'posixAccount')]
 
         if not user.hasAttribute('uid'):
@@ -278,11 +281,11 @@ class ManageUsers(Command):
         else:
             name = user.getSingleValue('uid')
 
-        modify += [self.makeModify(user, name, 'msSFU30Name', self.LDAP.schema().msRFU())]
-        modify += [self.makeModify(user, self.LDAP.nis(), 'msSFU30NisDomain', self.LDAP.schema().msRFU())]
+        modify += [self.makeModify(user, name, 'msSFU30Name', NIS.msRFU())]
+        modify += [self.makeModify(user, self.LDAP.nis(), 'msSFU30NisDomain', NIS.msRFU())]
 
         if not user.hasAttribute('unixUserPassword'):
-            modify += [self.makeModify(user, 'ABCD!efgh12345$67890', 'unixUserPassword', self.LDAP.schema().msRFU())]
+            modify += [self.makeModify(user, 'ABCD!efgh12345$67890', 'unixUserPassword', NIS.msRFU())]
 
         # TODO: we cannot fix things like loginShell, unixHomeDirectory unless we have a template
         # TODO: GECOS could be set from the current CN
