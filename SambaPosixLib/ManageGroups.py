@@ -40,6 +40,7 @@ class ManageGroups(Command):
 
         get_parser = modparsers.add_parser("getent", help="get getent like output for one, more, or all POSIX groups")
         get_parser.add_argument("group", nargs='*', help="group to list")
+        get_parser.add_argument('-P', '--include-primary-group', action='store_true', dest="primaries", help="also list users as members, which have the group as primary group")
 
         add_parser = modparsers.add_parser("add", help="add users to group")
         add_parser.add_argument("group", help="group to add users to")
@@ -76,8 +77,15 @@ class ManageGroups(Command):
                 if group is False:
                     self.Logger.error("Group %s does not exist!" % name)
                     return 1
-                # FIXME: collect all users, which have us as primaryGID
-                print group.formatAsGetent(self.LDAP)
+                primaryUsers = []
+                if self.opts['primaries'] is True:
+                    rid = group.getRID()
+                    for user in User.filterUsers(self.LDAP, '(&(objectClass=user)(uidNumber=*)(primaryGroupID=%d))' % rid):
+                        if user.hasAttribute('uid'):
+                            primaryUsers += [user.getSingleValue('uid')]
+                        else:
+                            primaryUsers += [user.getSingleValue('sAMAccountName')]
+                print group.formatAsGetent(self.LDAP, primaryUsers)
             return 0
         for group in Group.posixGroups(self.LDAP):
             print group.formatAsGetent(self.LDAP)

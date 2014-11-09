@@ -138,12 +138,15 @@ class Group(LDAPEntry):
                     members += member.resolveMembers(oLDAP, recursive)
         return members
 
-    def formatAsGetent(self, oLDAP):
+    def formatAsGetent(self, oLDAP, additional = []):
         out = []
         out += [self.getSingleValue('sAMAccountName')]
         out += ['*']
         out += [self.getSingleValue('gidNumber')]
         members = self.resolveMembers(oLDAP)
+        if isinstance(additional, list ) and len(additional) > 0:
+            unique = [x for x in additional if not x in members]
+            members += unique
         members = ",".join(members)
         if 'memberUid' in self:
             members += " ("+",".join(self.values('memberUid'))+")"
