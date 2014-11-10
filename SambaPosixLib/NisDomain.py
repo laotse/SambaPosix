@@ -27,6 +27,10 @@ class NisDomain(object):
         # some domain value caches
         self.domainSID = None
         self.nisDomain = None
+        # UID and GID start values
+        # TODO: read them from some config file and options
+        self.uidStart = 10000
+        self.gidStart = 10000
 
     ##
     # LDAP support for M$ proprietary NIS fields
@@ -193,6 +197,9 @@ class NisDomain(object):
         return self.encodeSID(domainSID, raw)
 
     def getNisDomain(self, oLDAP):
+        if self.nisDomain is not None:
+            return self.nisDomain
+
         log = Logger()
         if isinstance(oLDAP, str):
             self.nisDomain = oLDAP.lower()
@@ -219,40 +226,50 @@ class NisDomain(object):
         log.trace("NIS domain set to: %s" % self.nisDomain)
         return True
 
-"""
-If you really want your script to be of use, convert these bash script excerpts to python:
+    def _getDomainYP(self, oLDAP):
+        domain = self.getNisDomain(oLDAP)
+        if domain is False:
+            return False
 
-# Finds the next useable user uidNumber or group gidNumber
-# Input : $1
-# $1 : msSFU30MaxUidNumber or msSFU30MaxGidNumber
-# Output : the first free uidNumber or gidNumber
-_findnext () {
-  _NEXTID=$($LDBSEARCHBIN -H $DBPATH -b "CN=$LDOMAIN,CN=ypservers,CN=ypServ30,CN=RpcServices,CN=System,$SUFFIX" -s sub '(objectClass=msSFU30DomainInfo)' $1 | grep "$1: " | awk '{print $NF}')
-  if [ -z "$_NEXTID" ] || [ "$_NEXTID" -lt "$IDSTART" ]; then
-    _NEXTID="$IDSTART"
-  fi
-}
+        entry = oLDAP.readDN("CN=%s,%s" % (domain,"CN=ypservers,CN=ypServ30,CN=RpcServices,CN=System," + oLDAP.Root), True)
+        if entry is None:
+            return False
+        return LDAPEntry(entry)
 
-# UPDATE msSFU30MaxUidNumber/msSFU30MaxGidNumber
-# Input : $1 $2
-# $1: what to update (msSFU30MaxUidNumber or msSFU30MaxGidNumber)
-# $2: Next Number
-#
-# Output : Nothing
-_updatemax () {
-log_output "Updating $1"
+    def nextID(self, oLDAP):
+        entry = self._getDomainYP(oLDAP)
+        if entry is False:
+            return (False, False)
 
-echo "dn: CN=$LDOMAIN,CN=ypservers,CN=ypServ30,CN=RpcServices,CN=System,$SUFFIX
-changetype: modify
-replace: $1
-$1: $2" > /tmp/newgid
+        if entry.hasAttribute('msSFU30MaxUidNumber'):
+            uid = entry.getSingleValue('msSFU30MaxUidNumber')
+            uid = int(uid) + 1
+        else:
+            uid = self.uidStart
+        if entry.hasAttribute('msSFU30MaxGidNumber'):
+            gid = entry.getSingleValue('msSFU30MaxGidNumber')
+            gid = int(gid) +  1
+        else:
+            gid = self.gidStart
 
-$LDBMODIFYBIN --url=$KERBEROS /tmp/newgid  2>>"$LOGFILE" 1>/dev/null
-if [ $? != 0 ]; then
-    log_output "Error updating $1 in AD."
-    exit 1 # exits here if error
-fi
-rm -f /tmp/newgid
-log_output "Successfully updated $1 in AD"
-}
-"""
+        return (uid,gid)
+
+    def _storeID(self, guid, att, oLDAP):
+        entry = self._getDomainYP(oLDAP)
+        if entry is False:
+            return False
+
+        if entry.hasAttribute(att):
+            val = entry.getSingleValue(att)
+            if int(val) != int(guid):
+                oLDAP.modify(entry.dn(),[(ldap.MOD_REPLACE,att,guid)])
+        else:
+            oLDAP.modify(entry.dn(),[(ldap.MOD_ADD,att,guid)])
+
+        return True
+
+    def storeUID(self, uid, oLDAP):
+        return self._storeID(uid, 'msSFU30MaxUidNumber', oLDAP)
+
+    def storeGID(self, gid, oLDAP):
+        return self._storeID(gid, 'msSFU30MaxGidNumber', oLDAP)

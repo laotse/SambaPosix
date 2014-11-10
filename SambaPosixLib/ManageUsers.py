@@ -282,7 +282,7 @@ class ManageUsers(Command):
             name = user.getSingleValue('uid')
 
         modify += [self.makeModify(user, name, 'msSFU30Name', NIS.msRFU())]
-        modify += [self.makeModify(user, self.LDAP.nis(), 'msSFU30NisDomain', NIS.msRFU())]
+        modify += [self.makeModify(user, NIS.getNisDomain(self.LDAP), 'msSFU30NisDomain', NIS.msRFU())]
 
         if not user.hasAttribute('unixUserPassword'):
             modify += [self.makeModify(user, 'ABCD!efgh12345$67890', 'unixUserPassword', NIS.msRFU())]
@@ -333,8 +333,15 @@ class ManageUsers(Command):
             if not self.opts['all'] is True:
                 self.Logger.error("You must either specify a list of users to fix POSIX, or supply --fix-all-users")
                 return 5
+            max_uid = 0
             for user in User.filterUsers(self.LDAP, '(&(objectClass=user)(|(uidNumber=*)(objectClass=posixAccount)))'):
                 self._fix(user)
+                if user.hasAttribute('uidNumber'):
+                    uid = user.getSingleValue('uidNumber')
+                    if uid > max_uid: max_uid = uid
+            if max_uid > 0:
+                NIS = NisDomain()
+                NIS.storeUID(max_uid, self.LDAP)
         else:
             for name in self.opts['user']:
                 user = self._byName(name)
