@@ -143,15 +143,16 @@ class ManageGroups(Command):
             if not self.opts['all'] is True:
                 self.Logger.error("You must either specify a list of groups to fix POSIX, or supply --fix-all-groups")
                 return 5
-            max_gid = 0
-            for group in Group.filterGroups(self.LDAP, '(&(objectClass=group)(|(gidNumber=*)(objectClass=posixGroup)))'):
-                self._fix(group)
-                if group.hasAttribute('uidNumber'):
-                    gid = group.getSingleValue('gidNumber')
-                    if gid > max_gid: max_gid = gid
-            if max_gid > 0:
-                NIS = NisDomain()
-                NIS.storeGID(max_gid, self.LDAP)
+            NIS = NisDomain()
+            if NIS.msRFU():
+                max_gid = 0
+                for group in Group.filterGroups(self.LDAP, '(&(objectClass=group)(|(gidNumber=*)(objectClass=posixGroup)))'):
+                    self._fix(group)
+                    if group.hasAttribute('uidNumber'):
+                        gid = group.getSingleValue('gidNumber')
+                        if gid > max_gid: max_gid = gid
+                if max_gid > 0:
+                    NIS.storeGID(max_gid, self.LDAP)
         else:
             for name in self.opts['group']:
                 group = self._byName(name)
@@ -182,11 +183,18 @@ class ManageGroups(Command):
         gid = group.getSingleValue('gidNumber')
         if gid is None:
             if self.opts['gid'] is None:
-                raise InvalidCommand("group set %s -- no gid assigned nor specified" % self.opts['group'])
+                if NIS.msRFU():
+                    uid, ngid = NIS.nextID(self.LDAP)
+                else: ngid = False
+                if ngid is False:
+                    raise InvalidCommand("group set %s -- no gid assigned nor specified" % self.opts['group'])
+                self.opts['gid'] = ngid
 
             modify += [(ldap.MOD_ADD, 'gidNumber', self.opts['gid'])]
         elif gid != self.opts['gid']:
             modify += [(ldap.MOD_REPLACE, 'gidNumber', self.opts['gid'])]
+            if NIS.msRFU():
+                NIS.storeGID(self.opts['gid'], self.LDAP)
 
         if len(modify) > 0:
             self.LDAP.modify(group.dn(), modify)

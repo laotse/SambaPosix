@@ -193,6 +193,7 @@ class ManageUsers(Command):
         # sanitize options
         try:
             if not Validator.checkPosixID(self.opts['uid']):
+                # TODO: check for auto uid
                 raise ValueError("%s is not valid for user id" % self.opts['uid'])
             if not Validator.checkPosixID(self.opts['gid']):
                 if Validator.checkPosixName(self.opts['gid']):
@@ -232,8 +233,10 @@ class ManageUsers(Command):
         modify += [self.makeModify(user, self.LDAP.nis(), 'msSFU30NisDomain', NIS.msRFU())]
 
         modify += [self.makeModify(user, self.opts['uid'], 'uidNumber')]
-        # TODO: auto-add user to group, if gid is given?
+        if modify[-1][1] == 'uidNumber' and NIS.msRFU():
+            NIS.storeUID(self.opts['uid'], self.LDAP)
 
+        # No need to auto-add user to group, if gid is given. User is always member of primary group
         gid = self.opts['gid']
         if gid is None: gid = user.getSingleValue('gidNumber')
         rid = user.getSingleValue('primaryGroupID')
@@ -333,15 +336,16 @@ class ManageUsers(Command):
             if not self.opts['all'] is True:
                 self.Logger.error("You must either specify a list of users to fix POSIX, or supply --fix-all-users")
                 return 5
-            max_uid = 0
-            for user in User.filterUsers(self.LDAP, '(&(objectClass=user)(|(uidNumber=*)(objectClass=posixAccount)))'):
-                self._fix(user)
-                if user.hasAttribute('uidNumber'):
-                    uid = user.getSingleValue('uidNumber')
-                    if uid > max_uid: max_uid = uid
-            if max_uid > 0:
-                NIS = NisDomain()
-                NIS.storeUID(max_uid, self.LDAP)
+            NIS = NisDomain()
+            if NIS.msRFU():
+                max_uid = 0
+                for user in User.filterUsers(self.LDAP, '(&(objectClass=user)(|(uidNumber=*)(objectClass=posixAccount)))'):
+                    self._fix(user)
+                    if user.hasAttribute('uidNumber'):
+                        uid = user.getSingleValue('uidNumber')
+                        if uid > max_uid: max_uid = uid
+                if max_uid > 0:
+                    NIS.storeUID(max_uid, self.LDAP)
         else:
             for name in self.opts['user']:
                 user = self._byName(name)
