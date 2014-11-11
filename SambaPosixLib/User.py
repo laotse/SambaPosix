@@ -63,13 +63,14 @@ class User(LDAPEntry):
     def bySID(cls, sid, oLDAP):
         log = Logger()
         rid = ADValidator.normalizeRID(sid)
+        NIS = NisDomain()
         if not rid is False and isinstance(rid, int):
             # this is a RID
-            sid = oLDAP.getDomainSID(None, rid, True)
+            sid = NIS.getDomainSID(None, rid, True)
         else:
             if ADValidator.checkSID(sid):
                 # this is a plain SID
-                sid = oLDAP.encodeSID(sid,True)
+                sid = NisDomain.encodeSID(sid,True)
             elif ADValidator.checkBase64(sid):
                 # this could be a base64 encoded SID
                 sid = base64.b64decode(sid)
@@ -77,10 +78,10 @@ class User(LDAPEntry):
         esid = ldap.filter.escape_filter_chars(sid,2)
         entries = oLDAP.search('(&(objectClass=user)(objectSid=%s))' % esid)
         if entries is not None and len(entries) > 1:
-            log.error("AD database corrupt: %d entries for user SID %s" % (len(entries),oLDAP.decodeSID(sid)))
+            log.error("AD database corrupt: %d entries for user SID %s" % (len(entries),NisDomain.decodeSID(sid)))
             return False
         if entries is None or len(entries) < 1:
-            log.trace("User SID %s not found!" % oLDAP.decodeSID(sid))
+            log.trace("User SID %s not found!" % NisDomain.decodeSID(sid))
             return False
         return cls(entries[0])
 
