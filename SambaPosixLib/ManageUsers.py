@@ -193,7 +193,6 @@ class ManageUsers(Command):
         # sanitize options
         try:
             if not Validator.checkPosixID(self.opts['uid']):
-                # TODO: check for auto uid
                 raise ValueError("%s is not valid for user id" % self.opts['uid'])
             if not Validator.checkPosixID(self.opts['gid']):
                 if Validator.checkPosixName(self.opts['gid']):
@@ -232,6 +231,11 @@ class ManageUsers(Command):
         modify += [self.makeModify(user, name, 'msSFU30Name', NIS.msRFU())]
         modify += [self.makeModify(user, self.LDAP.nis(), 'msSFU30NisDomain', NIS.msRFU())]
 
+        if not user.hasAttribute('uidNumber') and self.opts['uid'] is None and NIS.msRFU():
+            # we have no uid, we did not specify one and we are in AD - get next uid from AD
+            uid, _ = NIS.nextID(self.Command)
+            if not uid is False:
+                self.opts['uid'] = uid
         modify += [self.makeModify(user, self.opts['uid'], 'uidNumber')]
         if modify[-1][1] == 'uidNumber' and NIS.msRFU():
             NIS.storeUID(self.opts['uid'], self.LDAP)
